@@ -1,3 +1,6 @@
 <resources>
     <string name="app_name">MoolacarbReactNativeFrontend</string>
+    <string name="facebook_app_id">1290529879292128</string>
+    <string name="facebook_client_token">a0abd400181584eddf775f0f0ba5e2b4</string>
+    <string name="fb_login_protocol_scheme">fb1290529879292128</string>
 </resources>

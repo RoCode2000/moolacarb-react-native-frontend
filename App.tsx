@@ -1,41 +1,41 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, FlatList } from 'react-native';
-import axios from 'axios';
+// App.tsx
+import React, { useState, useEffect } from 'react';
+import { NavigationContainer } from '@react-navigation/native';
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import LoginScreen from './src/screens/LoginScreen';
+import SignupScreen from './src/screens/SignupScreen';
+import HomeScreen from './src/screens/HomeScreen';
 
-type User = {
-  id: number;
-  name: string;
-  createdAt: string;
+export type RootStackParamList = {
+  Login: undefined;
+  Signup: undefined;
+  Home: undefined;
 };
 
-const App = () => {
-  const [users, setUsers] = useState<User[]>([]);
-  const [error, setError] = useState('');
+const Stack = createNativeStackNavigator<RootStackParamList>();
 
-  useEffect(() => {
-    axios.get<User[]>('http://10.0.2.2:8080/users')
-      .then(res => setUsers(res.data))
-      .catch(err => setError('Error: ' + err.message));
-  }, []);
+export default function App() {
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
 
   return (
-    <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-      {error ? (
-        <Text>{error}</Text>
-      ) : (
-        <FlatList
-          data={users}
-          keyExtractor={item => item.id.toString()}
-          renderItem={({ item }) => (
-            <View style={{ margin: 10 }}>
-              <Text>User: {item.name}</Text>
-              <Text>Created At: {item.createdAt}</Text>
-            </View>
-          )}
-        />
-      )}
-    </View>
+    <NavigationContainer>
+      <Stack.Navigator screenOptions={{ headerShown: false }}>
+        {!isLoggedIn ? (
+          <>
+            <Stack.Screen name="Login">
+              {(props) => (
+                <LoginScreen
+                  {...props}
+                  onLoginSuccess={() => setIsLoggedIn(true)}
+                />
+              )}
+            </Stack.Screen>
+            <Stack.Screen name="Signup" component={SignupScreen} />
+          </>
+        ) : (
+          <Stack.Screen name="Home" component={HomeScreen} />
+        )}
+      </Stack.Navigator>
+    </NavigationContainer>
   );
-};
-
-export default App;
+}
