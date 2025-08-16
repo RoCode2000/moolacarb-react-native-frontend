@@ -28,7 +28,7 @@ export default function HomeScreen() {
           keyExtractor={(item) => item.id.toString()}
           renderItem={({ item }) => (
             <View style={{ margin: 10 }}>
-              <Text>User: {item.name}</Text>
+              <Text>Test User: {item.name}</Text>
               <Text>Created At: {item.createdAt}</Text>
             </View>
           )}
