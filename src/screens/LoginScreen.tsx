@@ -46,15 +46,15 @@ const LoginScreen = ({ onLoginSuccess }: Props) => {
 
     const handleLogin = async () => {
       try {
-          const methods = await fetchSignInMethodsForEmail(auth, email);
-//           console.log('Existing methods for email:', methods);
+        const userCred = await signInWithEmailAndPassword(auth, email, password);
+        const user = userCred.user;
 
-        await signInWithEmailAndPassword(auth, email, password);
-//         console.log("Login successful");
-        onLoginSuccess(); // This will call setIsLoggedIn(true) in App.tsx
+        console.log("UID:", user.uid);
+        console.log("Email:", user.email);
+
+        onLoginSuccess();
       } catch (err: any) {
-//         console.error("Login failed", err);
-        setError(err.message); // Use existing state setter
+        setError(err.message);
       }
     };
 
