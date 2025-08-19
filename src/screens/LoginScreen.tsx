@@ -75,6 +75,23 @@ const LoginScreen = ({ onLoginSuccess }: Props) => {
         const googleCredential = GoogleAuthProvider.credential(idToken);
         await signInWithCredential(auth, googleCredential);
 //         console.log("Google login successful");
+
+         const payload = {
+                idToken: idToken,
+                userId: userInfo.data.user.id,
+                email: userInfo.data.user.email,
+                givenName: userInfo.data.user.givenName,
+                familyName: userInfo.data.user.familyName,
+                name: userInfo.data.user.name,
+                photoUrl: userInfo.data.user.photo
+              };
+
+         const response = await fetch('http://10.0.2.2:8080/api/user/google-login', {
+                 method: 'POST',
+                 headers: { 'Content-Type': 'application/json' },
+                 body: JSON.stringify(payload),
+               });
+
         onLoginSuccess();
       } catch (err) {
 //         console.error("Google login failed", err);

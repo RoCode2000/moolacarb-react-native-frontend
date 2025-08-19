@@ -5,6 +5,8 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import LoginScreen from './src/screens/LoginScreen';
 import SignupScreen from './src/screens/SignupScreen';
 import HomeScreen from './src/screens/HomeScreen';
+import { auth } from './src/config/firebaseConfig';
+import { onAuthStateChanged, User } from 'firebase/auth';
 
 export type RootStackParamList = {
   Login: undefined;
@@ -16,6 +18,22 @@ const Stack = createNativeStackNavigator<RootStackParamList>();
 
 export default function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+
+  useEffect(() => {
+      const unsubscribe = onAuthStateChanged(auth, (user: User | null) => {
+        setIsLoggedIn(!!user);
+        setLoading(false);
+      });
+
+      return unsubscribe; // cleanup listener on unmount
+    }, []);
+
+    if (loading) {
+      // You can replace this with a splash screen or loader
+      return null;
+    }
 
   return (
     <NavigationContainer>
