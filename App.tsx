@@ -2,19 +2,87 @@
 import React, { useState, useEffect } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+
+// Auth
 import LoginScreen from './src/screens/LoginScreen';
 import SignupScreen from './src/screens/SignupScreen';
+
+// Tabs (make sure these are default exports)
+import RecipeScreen from './src/screens/RecipeScreen';
+import FoodScanScreen from './src/screens/FoodScanScreen';
 import HomeScreen from './src/screens/HomeScreen';
+import ReportsScreen from './src/screens/ReportsScreen';
+import ProfileScreen from './src/screens/ProfileScreen';
+
+import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
+MaterialCommunityIcons.loadFont();
 import { auth } from './src/config/firebaseConfig';
 import { onAuthStateChanged, User } from 'firebase/auth';
 
 export type RootStackParamList = {
   Login: undefined;
   Signup: undefined;
+  Main: undefined;
+};
+
+export type TabParamList = {
+  Recipe: undefined;
+  FoodScan: undefined;
   Home: undefined;
+  Reports: undefined;
+  Profile: undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
+const Tab = createBottomTabNavigator<TabParamList>();
+
+function AppTabs({ onLogout }: { onLogout: () => void }) {
+  return (
+    <Tab.Navigator
+      initialRouteName="Home"
+      screenOptions={({ route }) => ({
+        headerShown: true,
+        tabBarShowLabel: true,
+        tabBarActiveTintColor: '#0f2b3a',
+        tabBarInactiveTintColor: '#425563',
+        tabBarLabelStyle: { fontSize: 12 },
+        tabBarStyle: { height: 64, paddingTop: 6, paddingBottom: 8 },
+        tabBarIcon: ({ color, size, focused }) => {
+          let name: string;
+          switch (route.name) {
+            case 'Recipe':
+              name = 'chef-hat';
+              break;
+            case 'FoodScan':
+              name = 'camera-outline';
+              break;
+            case 'Home':
+              name = focused ? 'home' : 'home-outline';
+              break;
+            case 'Reports':
+              name = 'chart-bar';
+              break;
+            case 'Profile':
+              name = focused ? 'account-circle' : 'account-circle-outline';
+              break;
+            default:
+              name = 'circle-outline';
+          }
+          return <MaterialCommunityIcons name={name} size={size} color={color} />;
+        },
+      })}
+    >
+      <Tab.Screen name="Recipe" component={RecipeScreen} options={{ title: 'Recipe' }} />
+      <Tab.Screen name="FoodScan" component={FoodScanScreen} options={{ title: 'Food Scan' }} />
+      <Tab.Screen name="Home" component={HomeScreen} options={{ title: 'Home' }} />
+      <Tab.Screen name="Reports" component={ReportsScreen} options={{ title: 'Reports' }} />
+      <Tab.Screen name="Profile" options={{ title: 'Profile' }}>
+        {(props) => <ProfileScreen {...props} onLogout={onLogout} />}
+      </Tab.Screen>
+    </Tab.Navigator>
+  );
+}
 
 export default function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -51,7 +119,9 @@ export default function App() {
             <Stack.Screen name="Signup" component={SignupScreen} />
           </>
         ) : (
-          <Stack.Screen name="Home" component={HomeScreen} />
+          <Stack.Screen name="Main">
+            {() => <AppTabs onLogout={() => setIsLoggedIn(false)} />}
+          </Stack.Screen>
         )}
       </Stack.Navigator>
     </NavigationContainer>
