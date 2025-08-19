@@ -20,6 +20,8 @@ export default function ProfileScreen({ onLogout }: Props) {
     }
   };
 
+  //console.log("hello world", auth);
+
   return (
     <View style={styles.container}>
       <Text style={styles.header}>Profile</Text>
