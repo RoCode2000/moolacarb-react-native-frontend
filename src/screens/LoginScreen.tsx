@@ -51,6 +51,12 @@ const LoginScreen = ({ onLoginSuccess }: Props) => {
 
         console.log("UID:", user.uid);
         console.log("Email:", user.email);
+        console.log(user);
+         const response = await fetch('http://10.0.2.2:8080/api/user/login', {
+                 method: 'POST',
+                 headers: { 'Content-Type': 'application/json' },
+                 body: JSON.stringify(payload),
+               });
 
         onLoginSuccess();
       } catch (err: any) {
@@ -65,6 +71,7 @@ const LoginScreen = ({ onLoginSuccess }: Props) => {
         // await GoogleSignin.signOut();
         const userInfo = await GoogleSignin.signIn();
 //         console.log('GoogleSignin userInfo:', userInfo);
+        console.log(userInfo)
 
         const idToken = userInfo.data.idToken;
         if (!idToken) {
@@ -91,7 +98,6 @@ const LoginScreen = ({ onLoginSuccess }: Props) => {
                  headers: { 'Content-Type': 'application/json' },
                  body: JSON.stringify(payload),
                });
-
         onLoginSuccess();
       } catch (err) {
 //         console.error("Google login failed", err);
