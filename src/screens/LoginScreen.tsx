@@ -16,7 +16,7 @@ import {
     FacebookAuthProvider,
     linkWithCredential,
     fetchSignInMethodsForEmail,
-    updatePassword
+    sendPasswordResetEmail
     } from 'firebase/auth';
 import { auth } from '../config/firebaseConfig';
 import '../config/googleConfig';
@@ -54,7 +54,7 @@ const LoginScreen = ({ onLoginSuccess }: Props) => {
 
         onLoginSuccess();
       } catch (err: any) {
-        setError(err.message);
+        setError("Unable to Sign In, Please ensure the entered Email and Password are correct");
       }
     };
 
@@ -65,6 +65,13 @@ const LoginScreen = ({ onLoginSuccess }: Props) => {
         // await GoogleSignin.signOut();
         const userInfo = await GoogleSignin.signIn();
 //         console.log('GoogleSignin userInfo:', userInfo);
+
+        const signInMethods = await fetchSignInMethodsForEmail(auth, email);
+
+          if (signInMethods.includes('password')) {
+            setError("This email is already registered. Please sign in using email & password or use a different email.");
+            return;
+          }
 
         const idToken = userInfo.data.idToken;
         if (!idToken) {
@@ -95,7 +102,7 @@ const LoginScreen = ({ onLoginSuccess }: Props) => {
         onLoginSuccess();
       } catch (err) {
 //         console.error("Google login failed", err);
-        setError("Google login failed");
+        setError("Google login failed. Please try again later.");
       }
     };
 
@@ -159,6 +166,30 @@ const LoginScreen = ({ onLoginSuccess }: Props) => {
       }
     };
 
+    const handleForgotPassword = async () => {
+      if (!email) {
+//           alert("problem ah")
+        setError("Please enter your registered email first.");
+        return;
+      }
+
+      try {
+        await sendPasswordResetEmail(auth, email);
+        setError(""); // clear error if any
+        alert("Password reset email sent! Please check your inbox.");
+      } catch (err: any) {
+        console.error("Error sending reset email:", err);
+        if (err.code === "auth/user-not-found") {
+          setError("No user found with this email.");
+        } else if (err.code === "auth/invalid-email") {
+          setError("Invalid email format.");
+        } else {
+          setError("Something went wrong. Please try again.");
+        }
+      }
+    };
+
+
 
 
 
@@ -206,12 +237,13 @@ const LoginScreen = ({ onLoginSuccess }: Props) => {
           secureTextEntry
         />
       </View>
+      {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
       <TouchableOpacity style={styles.signInButton} onPress={handleLogin}>
         <Text style={styles.signInTextButton}>Sign In</Text>
       </TouchableOpacity>
 
-      <TouchableOpacity>
+      <TouchableOpacity onPress={handleForgotPassword}>
         <Text style={styles.forgotText}>Forgot password?</Text>
       </TouchableOpacity>
 
@@ -321,6 +353,12 @@ const styles = StyleSheet.create({
     color: '#58B368',
     fontWeight: 'bold',
   },
+  errorText: {
+    color: 'red',
+    marginTop: 10,
+    textAlign: 'center',
+  },
+
 });
 
 export default LoginScreen;
