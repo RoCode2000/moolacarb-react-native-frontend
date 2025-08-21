@@ -1,26 +1,31 @@
+// src/screens/ProfileScreen.tsx
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Alert } from 'react-native';
 import { auth } from '../config/firebaseConfig';
 import { signOut } from 'firebase/auth';
+import { useUser } from '../context/UserContext';
+import type { RootStackParamList } from './App';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { useNavigation } from '@react-navigation/native';
 
 type Props = {
   onLogout: () => void;
 };
 
 export default function ProfileScreen({ onLogout }: Props) {
-  const user = auth.currentUser;
+  const { user, setUser } = useUser();
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
 
   const handleSignOut = async () => {
     try {
       await signOut(auth);
+      setUser(null);
       Alert.alert("Signed Out", "You have been signed out.");
-      onLogout(); // 🔑 triggers setIsLoggedIn(false) in App.tsx
+      onLogout(); // triggers navigation reset in App.tsx
     } catch (error) {
       console.error("Sign out error:", error);
     }
   };
-
-  //console.log("hello world", auth);
 
   return (
     <View style={styles.container}>
@@ -28,15 +33,20 @@ export default function ProfileScreen({ onLogout }: Props) {
 
       {user ? (
         <>
-          <Text style={styles.info}>Name: {user.displayName ?? "No Name"}</Text>
-          <Text style={styles.info}>auth: {user.uid ?? "No Name"}</Text>
+          <Text style={styles.info}>
+            Name: {user.firstName} {user.lastName}
+          </Text>
+          <Text style={styles.info}>Email: {user.email}</Text>
+          <Text style={styles.info}>Premium: {user.premium ?? "-"}</Text>
         </>
       ) : (
-        <Text style={styles.error}>No User Detected! Please Contact Admin</Text>
+        <Text style={styles.error}>
+          No User Detected! Please Contact Admin
+        </Text>
       )}
 
       {/* Profile Options */}
-      <TouchableOpacity style={styles.optionButton}>
+      <TouchableOpacity style={styles.optionButton} onPress={() => navigation.navigate('SubscriptionTier')}>
         <Text style={styles.optionText}>Subscription Tier</Text>
       </TouchableOpacity>
 

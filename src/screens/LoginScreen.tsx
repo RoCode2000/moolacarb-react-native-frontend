@@ -27,6 +27,7 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../../App';
 
 import { LoginManager, AccessToken } from 'react-native-fbsdk-next';
+import { useUser } from "../context/UserContext";
 
 type Props = {
   onLoginSuccess: () => void;
@@ -43,6 +44,7 @@ const LoginScreen = ({ onLoginSuccess }: Props) => {
   const [error, setError] = useState('');
   const provider = new GoogleAuthProvider();
   const navigation = useNavigation<LoginScreenNavProp>();
+  const { setUser } = useUser();
 
     const handleLogin = async () => {
       try {
@@ -52,11 +54,22 @@ const LoginScreen = ({ onLoginSuccess }: Props) => {
         console.log("UID:", user.uid);
         console.log("Email:", user.email);
         console.log(user);
-         const response = await fetch('http://10.0.2.2:8080/api/user/login', {
-                 method: 'POST',
-                 headers: { 'Content-Type': 'application/json' },
-                 body: JSON.stringify(payload),
-               });
+
+        const response = await fetch(`http://10.0.2.2:8080/api/user/me/${user.uid}`, {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json"
+          }
+        });
+
+        if (!response.ok) {
+          throw new Error("Failed to fetch user from backend");
+        }
+
+        const backendUser = await response.json();
+        console.log("Backend user:", backendUser);
+
+        setUser(backendUser);
 
         onLoginSuccess();
       } catch (err: any) {
@@ -90,25 +103,36 @@ const LoginScreen = ({ onLoginSuccess }: Props) => {
         await signInWithCredential(auth, googleCredential);
 //         console.log("Google login successful");
 
-         const payload = {
-                idToken: idToken,
-                userId: userInfo.data.user.id,
-                email: userInfo.data.user.email,
-                givenName: userInfo.data.user.givenName,
-                familyName: userInfo.data.user.familyName,
-                name: userInfo.data.user.name,
-                photoUrl: userInfo.data.user.photo
-              };
+        // Payload for backend
+        const payload = {
+          idToken: idToken,
+          userId: userInfo.data.user.id,
+          email: userInfo.data.user.email,
+          givenName: userInfo.data.user.givenName,
+          familyName: userInfo.data.user.familyName,
+          name: userInfo.data.user.name,
+          photoUrl: userInfo.data.user.photo
+        };
 
-         const response = await fetch('http://10.0.2.2:8080/api/user/google-login', {
-                 method: 'POST',
-                 headers: { 'Content-Type': 'application/json' },
-                 body: JSON.stringify(payload),
-               });
+        const response = await fetch("http://10.0.2.2:8080/api/user/google-login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+
+        if (!response.ok) {
+          throw new Error("Failed to fetch/create Google user in backend");
+        }
+
+        const backendUser = await response.json();
+        console.log("Backend Google user:", backendUser);
+
+        setUser(backendUser);
+
         onLoginSuccess();
       } catch (err) {
-        console.error("Google login failed", err);
-        setError("Google login failed. Please try again later.");
+//         console.error("Google login failed", err);
+        setError("Google login failed");
       }
     };
 
@@ -243,7 +267,6 @@ const LoginScreen = ({ onLoginSuccess }: Props) => {
           secureTextEntry
         />
       </View>
-      {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
       <TouchableOpacity style={styles.signInButton} onPress={handleLogin}>
         <Text style={styles.signInTextButton}>Sign In</Text>
