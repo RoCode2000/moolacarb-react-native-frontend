@@ -4,6 +4,9 @@ import { View, Text, TouchableOpacity, StyleSheet, Alert } from 'react-native';
 import { auth } from '../config/firebaseConfig';
 import { signOut } from 'firebase/auth';
 import { useUser } from '../context/UserContext';
+import type { RootStackParamList } from './App';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { useNavigation } from '@react-navigation/native';
 
 type Props = {
   onLogout: () => void;
@@ -11,6 +14,7 @@ type Props = {
 
 export default function ProfileScreen({ onLogout }: Props) {
   const { user, setUser } = useUser();
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
 
   const handleSignOut = async () => {
     try {
@@ -33,9 +37,7 @@ export default function ProfileScreen({ onLogout }: Props) {
             Name: {user.firstName} {user.lastName}
           </Text>
           <Text style={styles.info}>Email: {user.email}</Text>
-          <Text style={styles.info}>Status: {user.userStatus ?? "N/A"}</Text>
-          <Text style={styles.info}>Premium: {user.premium ?? "Free"}</Text>
-          <Text style={styles.info}>Firebase ID: {user.firebaseId}</Text>
+          <Text style={styles.info}>Premium: {user.premium ?? "-"}</Text>
         </>
       ) : (
         <Text style={styles.error}>
@@ -44,7 +46,7 @@ export default function ProfileScreen({ onLogout }: Props) {
       )}
 
       {/* Profile Options */}
-      <TouchableOpacity style={styles.optionButton}>
+      <TouchableOpacity style={styles.optionButton} onPress={() => navigation.navigate('SubscriptionTier')}>
         <Text style={styles.optionText}>Subscription Tier</Text>
       </TouchableOpacity>
 

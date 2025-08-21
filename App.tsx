@@ -14,6 +14,7 @@ import FoodScanScreen from './src/screens/FoodScanScreen';
 import HomeScreen from './src/screens/HomeScreen';
 import ReportsScreen from './src/screens/ReportsScreen';
 import ProfileScreen from './src/screens/ProfileScreen';
+import SubscriptionTierScreen from './src/screens/SubscriptionTierScreen';
 
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 MaterialCommunityIcons.loadFont();
@@ -26,6 +27,7 @@ export type RootStackParamList = {
   Login: undefined;
   Signup: undefined;
   Main: undefined;
+  SubscriptionTier: undefined;
 };
 
 export type TabParamList = {
@@ -122,9 +124,17 @@ export default function App() {
                 <Stack.Screen name="Signup" component={SignupScreen} />
               </>
             ) : (
-              <Stack.Screen name="Main">
-                {() => <AppTabs onLogout={() => setIsLoggedIn(false)} />}
-              </Stack.Screen>
+            <>
+                  <Stack.Screen name="Main">
+                    {() => <AppTabs onLogout={() => setIsLoggedIn(false)} />}
+                  </Stack.Screen>
+
+                  <Stack.Screen
+                    name="SubscriptionTier"
+                    component={SubscriptionTierScreen}
+                    options={{ headerShown: true, title: "Subscription Tier" }}
+                  />
+                </>
             )}
           </Stack.Navigator>
         </NavigationContainer>
