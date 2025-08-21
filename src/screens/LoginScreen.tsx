@@ -72,8 +72,8 @@ const LoginScreen = ({ onLoginSuccess }: Props) => {
         const userInfo = await GoogleSignin.signIn();
 //         console.log('GoogleSignin userInfo:', userInfo);
         console.log(userInfo)
-
-        const signInMethods = await fetchSignInMethodsForEmail(auth, email);
+        const userEmail = userInfo.data.user.email;
+        const signInMethods = await fetchSignInMethodsForEmail(auth, userEmail);
 
           if (signInMethods.includes('password')) {
             setError("This email is already registered. Please sign in using email & password or use a different email.");
@@ -107,7 +107,7 @@ const LoginScreen = ({ onLoginSuccess }: Props) => {
                });
         onLoginSuccess();
       } catch (err) {
-//         console.error("Google login failed", err);
+        console.error("Google login failed", err);
         setError("Google login failed. Please try again later.");
       }
     };
