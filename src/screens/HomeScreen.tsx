@@ -5,12 +5,14 @@ import MealRecom from "../components/MealRecom";
 import MealLog, { FoodEntry } from "../components/MealLog";
 import ExerciseLog, { ExerciseEntry } from "../components/ExerciseLog";
 import { colors } from "../theme/colors";
+import { auth } from '../config/firebaseConfig';
 
 const W = Dimensions.get("window").width;
 
 export default function HomeScreen({ goToGoal }: { goToGoal: () => void }) {
   const consumed = 1200;
   const goal = 2000;
+  const user = auth.currentUser;
 
   const recs = [
     { id: "1", name: "Grilled Chicken", kcal: 320 },
@@ -37,6 +39,7 @@ export default function HomeScreen({ goToGoal }: { goToGoal: () => void }) {
         {/* <Pressable onPress={goToGoal}> */}
           <CalorieGoal consumed={consumed} goal={goal} />
         {/* </Pressable> */}
+
 
 
         <MealRecom width={W} items={recs} />

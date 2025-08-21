@@ -29,6 +29,7 @@ export default function ProfileScreen({ onLogout }: Props) {
       {user ? (
         <>
           <Text style={styles.info}>Name: {user.displayName ?? "No Name"}</Text>
+          <Text style={styles.info}>auth: {user.uid ?? "No Name"}</Text>
         </>
       ) : (
         <Text style={styles.error}>No User Detected! Please Contact Admin</Text>

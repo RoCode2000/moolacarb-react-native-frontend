@@ -44,11 +44,12 @@ export default function SignUpScreen() {
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       console.log("User created:", userCredential.user);
-
+        console.log("New User Credentials: ", userCredential);
       const payload = {
             name: name,
             email: email,
             password: password,
+            firebaseId: userCredential.user.uid
           };
 
       const response = await fetch('http://10.0.2.2:8080/api/user/login', {
@@ -90,6 +91,11 @@ export default function SignUpScreen() {
       await signInWithCredential(auth, googleCredential);
       console.log("Google login successful");
 
+      const currentUser = auth.currentUser;
+//       if (currentUser) {
+//           console.log("This is currentUsers: ", currentUser.uid)
+//       }
+
       const payload = {
         idToken: idToken,
         userId: userInfo.data.user.id,
@@ -97,7 +103,8 @@ export default function SignUpScreen() {
         givenName: userInfo.data.user.givenName,
         familyName: userInfo.data.user.familyName,
         name: userInfo.data.user.name,
-        photoUrl: userInfo.data.user.photo
+        photoUrl: userInfo.data.user.photo,
+        firebaseId: currentUser.uid
       };
 
       const response = await fetch('http://10.0.2.2:8080/api/user/google-login', {
