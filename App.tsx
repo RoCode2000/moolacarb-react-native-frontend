@@ -20,6 +20,8 @@ MaterialCommunityIcons.loadFont();
 import { auth } from './src/config/firebaseConfig';
 import { onAuthStateChanged, User } from 'firebase/auth';
 
+import { UserProvider } from "./src/context/UserContext";
+
 export type RootStackParamList = {
   Login: undefined;
   Signup: undefined;
@@ -104,26 +106,28 @@ export default function App() {
     }
 
   return (
-    <NavigationContainer>
-      <Stack.Navigator screenOptions={{ headerShown: false }}>
-        {!isLoggedIn ? (
-          <>
-            <Stack.Screen name="Login">
-              {(props) => (
-                <LoginScreen
-                  {...props}
-                  onLoginSuccess={() => setIsLoggedIn(true)}
-                />
-              )}
-            </Stack.Screen>
-            <Stack.Screen name="Signup" component={SignupScreen} />
-          </>
-        ) : (
-          <Stack.Screen name="Main">
-            {() => <AppTabs onLogout={() => setIsLoggedIn(false)} />}
-          </Stack.Screen>
-        )}
-      </Stack.Navigator>
-    </NavigationContainer>
+    <UserProvider>
+        <NavigationContainer>
+          <Stack.Navigator screenOptions={{ headerShown: false }}>
+            {!isLoggedIn ? (
+              <>
+                <Stack.Screen name="Login">
+                  {(props) => (
+                    <LoginScreen
+                      {...props}
+                      onLoginSuccess={() => setIsLoggedIn(true)}
+                    />
+                  )}
+                </Stack.Screen>
+                <Stack.Screen name="Signup" component={SignupScreen} />
+              </>
+            ) : (
+              <Stack.Screen name="Main">
+                {() => <AppTabs onLogout={() => setIsLoggedIn(false)} />}
+              </Stack.Screen>
+            )}
+          </Stack.Navigator>
+        </NavigationContainer>
+    </UserProvider>
   );
 }
