@@ -267,6 +267,7 @@ const LoginScreen = ({ onLoginSuccess }: Props) => {
           secureTextEntry
         />
       </View>
+      {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
       <TouchableOpacity style={styles.signInButton} onPress={handleLogin}>
         <Text style={styles.signInTextButton}>Sign In</Text>
