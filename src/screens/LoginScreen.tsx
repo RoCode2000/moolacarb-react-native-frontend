@@ -28,7 +28,7 @@ import type { RootStackParamList } from '../../App';
 
 import { LoginManager, AccessToken } from 'react-native-fbsdk-next';
 import { useUser } from "../context/UserContext";
-
+import { Alert } from "react-native";
 type Props = {
   onLoginSuccess: () => void;
 };
@@ -285,9 +285,16 @@ const LoginScreen = ({ onLoginSuccess }: Props) => {
 
       <Text style={styles.orText}>— or —</Text>
 
-      <TouchableOpacity>
-        <Text style={styles.guestText}>Continue as Guest</Text>
-      </TouchableOpacity>
+        <TouchableOpacity
+          onPress={() => {
+            Alert.alert(
+              "Guest Mode Coming Soon",
+              "Please sign up or log in to access MoolaCarb features."
+            );
+          }}
+        >
+          <Text style={styles.guestText}>Continue as Guest</Text>
+        </TouchableOpacity>
     </View>
   );
 };
