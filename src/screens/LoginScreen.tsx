@@ -28,6 +28,8 @@ import type { RootStackParamList } from '../../App';
 
 import { LoginManager, AccessToken } from 'react-native-fbsdk-next';
 
+import AsyncStorage from "@react-native-async-storage/async-storage";
+
 type Props = {
   onLoginSuccess: () => void;
 };
@@ -44,6 +46,17 @@ const LoginScreen = ({ onLoginSuccess }: Props) => {
   const provider = new GoogleAuthProvider();
   const navigation = useNavigation<LoginScreenNavProp>();
 
+  const saveUid = async () => {
+    const user = auth.currentUser;
+    if (user?.uid) {
+      await AsyncStorage.setItem("userId", user.uid);
+      if (user.email) {
+        await AsyncStorage.setItem("email", user.email);
+      }
+    }
+  };
+
+
     const handleLogin = async () => {
       try {
           const methods = await fetchSignInMethodsForEmail(auth, email);
@@ -51,6 +64,7 @@ const LoginScreen = ({ onLoginSuccess }: Props) => {
 
         await signInWithEmailAndPassword(auth, email, password);
 //         console.log("Login successful");
+        await saveUid();
         onLoginSuccess(); // This will call setIsLoggedIn(true) in App.tsx
       } catch (err: any) {
 //         console.error("Login failed", err);
@@ -75,6 +89,7 @@ const LoginScreen = ({ onLoginSuccess }: Props) => {
         const googleCredential = GoogleAuthProvider.credential(idToken);
         await signInWithCredential(auth, googleCredential);
 //         console.log("Google login successful");
+        await saveUid();
         onLoginSuccess();
       } catch (err) {
 //         console.error("Google login failed", err);
@@ -97,6 +112,7 @@ const LoginScreen = ({ onLoginSuccess }: Props) => {
 
           await signInWithCredential(auth, facebookCredential);
 //           console.log('Facebook login successful');
+          await saveUid();
           onLoginSuccess();
         } catch (error: any) {
           if (error.code === 'auth/account-exists-with-different-credential') {
@@ -130,6 +146,7 @@ const LoginScreen = ({ onLoginSuccess }: Props) => {
             if (existingUser) {
               await linkWithCredential(existingUser, pendingCred);
 //               console.log('Facebook successfully linked to existing account');
+              await saveUid();
               onLoginSuccess();
             }
           } else {
