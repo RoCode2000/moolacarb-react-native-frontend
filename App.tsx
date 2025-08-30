@@ -10,6 +10,7 @@ import SignupScreen from './src/screens/SignupScreen';
 
 // Tabs (make sure these are default exports)
 import RecipeScreen from './src/screens/RecipeScreen';
+import RecipeDetailScreen from "./src/screens/RecipeDetailScreen";
 import FoodScanScreen from './src/screens/FoodScanScreen';
 import HomeScreen from './src/screens/HomeScreen';
 import ReportsScreen from './src/screens/ReportsScreen';
@@ -22,6 +23,7 @@ import { auth } from './src/config/firebaseConfig';
 import { onAuthStateChanged, User } from 'firebase/auth';
 
 import { UserProvider } from "./src/context/UserContext";
+import { RecipeProvider } from './src/context/RecipeContext';
 
 export type RootStackParamList = {
   Login: undefined;
@@ -109,6 +111,7 @@ export default function App() {
 
   return (
     <UserProvider>
+        <RecipeProvider>
         <NavigationContainer>
           <Stack.Navigator screenOptions={{ headerShown: false }}>
             {!isLoggedIn ? (
@@ -130,6 +133,12 @@ export default function App() {
                   </Stack.Screen>
 
                   <Stack.Screen
+                    name="RecipeDetailScreen"
+                    component={RecipeDetailScreen}
+                    options={{ headerShown: true, title: "Recipe Details" }}
+                  />
+
+                  <Stack.Screen
                     name="SubscriptionTier"
                     component={SubscriptionTierScreen}
                     options={{ headerShown: true, title: "Subscription Tier" }}
@@ -138,6 +147,7 @@ export default function App() {
             )}
           </Stack.Navigator>
         </NavigationContainer>
+        </RecipeProvider>
     </UserProvider>
   );
 }

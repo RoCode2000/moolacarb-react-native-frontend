@@ -13,6 +13,10 @@ import { colors } from "../theme/colors";
 import { useUser } from "../context/UserContext";
 import Ionicons from "react-native-vector-icons/Ionicons";
 import AddRecipeModal from "../components/AddRecipeModal";
+import { useNavigation } from "@react-navigation/native";
+import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import type { RootStackParamList } from "../App";
+import { useRecipes } from "../context/RecipeContext";
 
 interface Recipe {
   recipeId: string;
@@ -38,180 +42,26 @@ interface Recipe {
   mealType: string;
   overallRating: number;
   imageLink: string;
+  imageBinary: string;
 }
 
-// const RecipeScreen: React.FC = () => {
-//   const [recipes, setRecipes] = useState<Recipe[]>([]);
-//   const [favourites, setFavourites] = useState<string[]>([]);
-//   const [showFavourites, setShowFavourites] = useState(false);
-//   const [search, setSearch] = useState("");
-//   const [sortAsc, setSortAsc] = useState(true);
-//
-//   const { user } = useUser();
-//   const isPremium = user?.premium === "P";
-//
-//   // Fetch all recipes
-//   const fetchRecipes = async () => {
-//     try {
-//       const response = await fetch("http://10.0.2.2:8080/api/recipe/active");
-//       if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-//       const data: Recipe[] = await response.json();
-//       setRecipes(data);
-//     } catch (error) {
-//       console.error("Failed to fetch recipes:", error);
-//     }
-//   };
-//
-//   // Fetch favourite recipes (only needed for premium users)
-//   const fetchFavourites = async () => {
-//     if (!isPremium || !user?.userId) return;
-//
-//     try {
-//       const response = await fetch("http://10.0.2.2:8080/api/fav/active", {
-//         method: "POST",
-//         headers: { "Content-Type": "application/json" },
-//         body: JSON.stringify({ userId: user.userId }),
-//       });
-//
-//       if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-//
-//       const favRecipes: Recipe[] = await response.json();
-//       setFavourites(favRecipes.map((r) => r.recipeId));
-//     } catch (error) {
-//       console.error("Failed to fetch favourites:", error);
-//     }
-//   };
-//
-//   useEffect(() => {
-//     fetchRecipes();
-//   }, []);
-//
-//   useEffect(() => {
-//     fetchFavourites();
-//   }, [user]);
-//
-//   const toggleFavourite = async (id: string) => {
-//     if (!isPremium || !user?.userId) return;
-//
-//     try {
-//       const response = await fetch("http://10.0.2.2:8080/api/fav/toggle", {
-//         method: "POST",
-//         headers: { "Content-Type": "application/json" },
-//         body: JSON.stringify({ userId: user.userId, recipeId: id }),
-//       });
-//
-//       if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-//
-//       setFavourites((prev) =>
-//         prev.includes(id) ? prev.filter((fid) => fid !== id) : [...prev, id]
-//       );
-//     } catch (error) {
-//       console.error("Failed to toggle favourite:", error);
-//     }
-//   };
-//
-//   const displayedRecipes = isPremium
-//     ? recipes
-//         .filter((r) => r.title.toLowerCase().includes(search.toLowerCase()))
-//         .filter((r) => (showFavourites ? favourites.includes(r.recipeId) : true))
-//         .sort((a, b) => (sortAsc ? a.title.localeCompare(b.title) : b.title.localeCompare(a.title)))
-//     : recipes.sort(() => 0.5 - Math.random()).slice(0, 3);
-//
-//   const renderRecipe = ({ item }: { item: Recipe }) => {
-//     const isFav = favourites.includes(item.recipeId);
-//
-//     return (
-//       <View style={styles.card}>
-//         {isPremium && (
-//           <TouchableOpacity
-//             style={styles.heartIcon}
-//             onPress={() => toggleFavourite(item.recipeId)}
-//           >
-//             <Ionicons name={isFav ? "heart" : "heart-outline"} size={24} color={isFav ? "red" : "#999"} />
-//           </TouchableOpacity>
-//         )}
-//
-//         <Image source={{ uri: item.imageLink }} style={styles.image} />
-//
-//         <View style={styles.cardContent}>
-//           <Text style={styles.title} numberOfLines={2} ellipsizeMode="tail">{item.title}</Text>
-//         <View style={styles.tagsAndButton}>
-//           <View style={styles.tagsRow}>
-//             <Text style={styles.tag}>Prep {item.prepTime} mins</Text>
-//             <Text style={styles.tag}>Cook {item.cookTime} mins</Text>
-//             <View style={[styles.kcalPill, styles.kcalLogged]}>
-//               <Text style={styles.kcalTxt}>{item.calories} kcal</Text>
-//             </View>
-//           </View>
-//
-//           <TouchableOpacity style={styles.button}>
-//             <Text style={styles.buttonText}>View Recipe</Text>
-//           </TouchableOpacity>
-//         </View>
-//       </View>
-//      </View>
-//     );
-//   };
-//
-//   return (
-//     <View style={styles.container}>
-//       {isPremium && (
-//         <View style={styles.searchRow}>
-//           <TextInput
-//             style={styles.searchInput}
-//             placeholder="Search"
-//             value={search}
-//             onChangeText={setSearch}
-//           />
-//           <TouchableOpacity style={styles.sortButton} onPress={() => setSortAsc(!sortAsc)}>
-//             <Text>{sortAsc ? "A-Z" : "Z-A"}</Text>
-//           </TouchableOpacity>
-//         </View>
-//       )}
-//
-//       {isPremium && (
-//         <TouchableOpacity
-//           onPress={() => setShowFavourites((prev) => !prev)}
-//           style={{
-//             backgroundColor: "#ff6347",
-//             paddingHorizontal: 15,
-//             paddingVertical: 10,
-//             borderRadius: 8,
-//             marginBottom: 10,
-//           }}
-//         >
-//           <Text style={{ color: "#fff", fontWeight: "bold" }}>
-//             {showFavourites ? "All Recipes" : "View Favourites"}
-//           </Text>
-//         </TouchableOpacity>
-//       )}
-//
-//       <FlatList
-//         data={displayedRecipes}
-//         keyExtractor={(item) => item.recipeId.toString()}
-//         renderItem={renderRecipe}
-//         contentContainerStyle={{ paddingBottom: 50 }}
-//       />
-//
-//       {!isPremium && (
-//         <TouchableOpacity style={styles.unlockButton}>
-//           <Text style={styles.unlockText}>🔓 Sign Up to Unlock More Recipes</Text>
-//         </TouchableOpacity>
-//       )}
-//     </View>
-//   );
-// };
+type RecipeScreenNavigationProp = NativeStackNavigationProp<
+  RootStackParamList,
+  "RecipeScreen"
+>;
 
 const RecipeScreen: React.FC = () => {
+  const navigation = useNavigation<RecipeScreenNavigationProp>();
   const [recipes, setRecipes] = useState<Recipe[]>([]);
   const [favourites, setFavourites] = useState<string[]>([]);
   const [activeTab, setActiveTab] = useState<"All" | "Favourites" | "My">("All");
   const [search, setSearch] = useState("");
   const [sortAsc, setSortAsc] = useState(true);
   const [showAddDialog, setShowAddDialog] = useState(false);
-
+  const [favouriteRecipes, setFavouriteRecipes] = useState<Recipe[]>([]);
   const { user } = useUser();
   const isPremium = user?.premium === "P";
+  const { addRecipe } = useRecipes();
 
   // Fetch all recipes
   const fetchRecipes = async () => {
@@ -242,11 +92,22 @@ const RecipeScreen: React.FC = () => {
 
   useEffect(() => {
     fetchRecipes();
+    fetchFavourites();
   }, []);
 
   useEffect(() => {
-    fetchFavourites();
-  }, [user]);
+    if (activeTab === "Favourites") {
+      fetchFavouriteRecipes();
+    }
+  }, [activeTab]);
+
+  useEffect(() => {
+    if (activeTab === "My") {
+      fetchMyRecipes();
+    } else {
+      fetchRecipes(); // All or Favourites tab
+    }
+  }, [activeTab]);
 
   const toggleFavourite = async (id: string) => {
     if (!isPremium || !user?.userId) return;
@@ -266,18 +127,57 @@ const RecipeScreen: React.FC = () => {
   };
 
   // Filter recipes based on active tab
-  const filteredRecipes = recipes.filter((r) => {
-    // Filter by tab
-    if (activeTab === "Favourites") return favourites.includes(r.recipeId);
-    if (activeTab === "My") return r.author === user?.userId;
-    return true; // "All" tab
-  }).filter((r) => r.title.toLowerCase().includes(search.toLowerCase())); // search
+  const filteredRecipes =
+    activeTab === "Favourites"
+      ? favouriteRecipes
+      : activeTab === "My"
+      ? recipes.filter((r) => r.author === user?.userId)
+      : recipes;// search
 
-  const sortedRecipes = filteredRecipes.sort((a, b) =>
+  const searchedRecipes = filteredRecipes.filter((r) =>
+    r.title.toLowerCase().includes(search.toLowerCase())
+  );
+
+  const sortedRecipes = searchedRecipes.sort((a, b) =>
     sortAsc ? a.title.localeCompare(b.title) : b.title.localeCompare(a.title)
   );
 
+  const fetchFavouriteRecipes = async () => {
+    if (!isPremium || !user?.userId) return;
+    try {
+      const response = await fetch("http://10.0.2.2:8080/api/fav/active", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: user.userId }),
+      });
+      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+      const data: Recipe[] = await response.json();
+      setFavouriteRecipes(data);
+    } catch (error) {
+      console.error("Failed to fetch favourite recipes:", error);
+    }
+  };
+
+
+  const fetchMyRecipes = async () => {
+    if (!user?.userId) return;
+    try {
+      const response = await fetch(`http://10.0.2.2:8080/api/recipe/${user.userId}`);
+      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+      const data: Recipe[] = await response.json();
+
+      setRecipes(prev => {
+        const others = prev.filter(r => r.author !== user.userId);
+        return [...others, ...data];
+      });
+    } catch (error) {
+      console.error("Failed to fetch my recipes:", error);
+    }
+  };
+
   const renderRecipe = ({ item }: { item: Recipe }) => {
+
+    const imageSource = { uri: `data:image/jpeg;base64,${item.imageBinary}` };
     const isFav = favourites.includes(item.recipeId);
     return (
       <View style={styles.card}>
@@ -294,7 +194,7 @@ const RecipeScreen: React.FC = () => {
           </TouchableOpacity>
         )}
 
-        <Image source={{ uri: item.imageLink }} style={styles.image} />
+        <Image source={imageSource} style={styles.image} />
 
         <View style={styles.cardContent}>
           <Text style={styles.title} numberOfLines={2} ellipsizeMode="tail">
@@ -310,7 +210,11 @@ const RecipeScreen: React.FC = () => {
               </View>
             </View>
 
-            <TouchableOpacity style={styles.button}>
+            <TouchableOpacity style={styles.button}
+            onPress={() => {
+                          addRecipe(item); // store in context
+                          navigation.navigate("RecipeDetailScreen", { recipeId: item.recipeId });
+                        }}>
               <Text style={styles.buttonText}>View Recipe</Text>
             </TouchableOpacity>
           </View>

@@ -11,59 +11,81 @@ import {
   StyleSheet,
 } from "react-native";
 import { launchCamera, launchImageLibrary } from "react-native-image-picker";
-import { Recipe } from "../types/Recipe"; // create a types file if you want
+import { Recipe } from "../types/Recipe";
 import { useUser } from "../context/UserContext";
+import { readFile } from "react-native-fs"; // npm install react-native-fs
 
 interface AddRecipeModalProps {
   visible: boolean;
   onClose: () => void;
-  onSave: () => void; // optional callback after save to refresh list
+  onSave?: () => void;
 }
 
 const AddRecipeModal: React.FC<AddRecipeModalProps> = ({ visible, onClose, onSave }) => {
   const { user } = useUser();
   const [newRecipe, setNewRecipe] = useState<Partial<Recipe>>({});
   const [imageUri, setImageUri] = useState<string | null>(null);
+  const [imageBase64, setImageBase64] = useState<string | null>(null);
 
   const pickImage = () => {
-    launchImageLibrary(
-      { mediaType: "photo", quality: 0.7 },
-      (response) => {
-        if (!response.didCancel && response.assets && response.assets.length > 0) {
-          const uri = response.assets[0].uri;
-          setImageUri(uri);
-          setNewRecipe({ ...newRecipe, imageLink: uri });
-        }
-      }
-    );
-  };
+    launchImageLibrary({ mediaType: "photo", quality: 0.7 }, async (response) => {
+      if (!response.didCancel && response.assets && response.assets.length > 0) {
+        const uri = response.assets[0].uri!;
+        setImageUri(uri);
+        setNewRecipe({ ...newRecipe, imageLink: uri });
 
+        // Convert image to base64
+        const base64 = await readFile(uri, "base64");
+        setImageBase64(base64);
+      }
+    });
+  };
 
   const takePhoto = () => {
-    launchCamera(
-      { mediaType: "photo", quality: 0.7 },
-      (response) => {
-        if (!response.didCancel && response.assets && response.assets.length > 0) {
-          const uri = response.assets[0].uri;
-          setImageUri(uri);
-          setNewRecipe({ ...newRecipe, imageLink: uri });
-        }
-      }
-    );
-  };
+    launchCamera({ mediaType: "photo", quality: 0.7 }, async (response) => {
+      if (!response.didCancel && response.assets && response.assets.length > 0) {
+        const uri = response.assets[0].uri!;
+        setImageUri(uri);
+        setNewRecipe({ ...newRecipe, imageLink: uri });
 
+        const base64 = await readFile(uri, "base64");
+        setImageBase64(base64);
+      }
+    });
+  };
 
   const handleSaveRecipe = async () => {
     try {
       if (!user?.userId) throw new Error("User not found");
+      if (!imageBase64) throw new Error("Image is required");
 
       const payload = {
-        ...newRecipe,
+        title: newRecipe.title || "",
+        serving: newRecipe.serving || 1,
+        ingredients: newRecipe.ingredients || "",
+        instructions: newRecipe.instructions || "",
+        calories: newRecipe.calories || 0,
+        carbohydrates: newRecipe.carbohydrates || 0,
+        protein: newRecipe.protein || 0,
+        fat: newRecipe.fat || 0,
+        saturatedFat: newRecipe.saturatedFat || 0,
+        sodium: newRecipe.sodium || 0,
+        cholesterol: newRecipe.cholesterol || 0,
+        potassium: newRecipe.potassium || 0,
+        prepTime: newRecipe.prepTime || 0,
+        cookTime: newRecipe.cookTime || 0,
+        restingTime: newRecipe.restingTime || 0,
+        cuisine: newRecipe.cuisine || "",
+        description: newRecipe.description || "",
+        mealType: newRecipe.mealType || "",
+        status: user.userId === "admin" ? "A" : "P",
+        overallRating: newRecipe.overallRating || 0,
+        imageLink: newRecipe.imageLink || "",
+        imageBinary: imageBase64,
         author: user.userId,
-        overallRating: 0,
       };
 
-      const response = await fetch("http://10.0.2.2:8080/api/recipe/create", {
+      const response = await fetch("http://10.0.2.2:8080/api/recipe/add", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -74,6 +96,7 @@ const AddRecipeModal: React.FC<AddRecipeModalProps> = ({ visible, onClose, onSav
       Alert.alert("Success", "Recipe added!");
       setNewRecipe({});
       setImageUri(null);
+      setImageBase64(null);
       onClose();
       onSave?.();
     } catch (err) {
@@ -81,6 +104,7 @@ const AddRecipeModal: React.FC<AddRecipeModalProps> = ({ visible, onClose, onSav
       Alert.alert("Error", "Could not add recipe.");
     }
   };
+
 
   return (
     <Modal visible={visible} animationType="slide" transparent={true}>
@@ -137,7 +161,7 @@ const AddRecipeModal: React.FC<AddRecipeModalProps> = ({ visible, onClose, onSav
               }
             />
 
-            {/* Repeat other numeric fields (carbs, protein, fat, sodium...) */}
+            {/* Other numeric fields */}
             <TextInput
               placeholder="Carbohydrates"
               style={styles.input}
@@ -148,9 +172,29 @@ const AddRecipeModal: React.FC<AddRecipeModalProps> = ({ visible, onClose, onSav
               }
             />
 
-            {/* Prep, Cook, Resting Time */}
             <TextInput
-              placeholder="Prep Time (mins)"
+              placeholder="Protein"
+              style={styles.input}
+              keyboardType="numeric"
+              value={newRecipe.protein?.toString() || ""}
+              onChangeText={(text) =>
+                setNewRecipe({ ...newRecipe, protein: parseFloat(text) || 0 })
+              }
+            />
+
+            <TextInput
+              placeholder="Fat"
+              style={styles.input}
+              keyboardType="numeric"
+              value={newRecipe.fat?.toString() || ""}
+              onChangeText={(text) =>
+                setNewRecipe({ ...newRecipe, fat: parseFloat(text) || 0 })
+              }
+            />
+
+            {/* Prep/Cook/Resting Times */}
+            <TextInput
+              placeholder="Prep Time"
               style={styles.input}
               keyboardType="numeric"
               value={newRecipe.prepTime?.toString() || ""}
@@ -159,7 +203,7 @@ const AddRecipeModal: React.FC<AddRecipeModalProps> = ({ visible, onClose, onSav
               }
             />
             <TextInput
-              placeholder="Cook Time (mins)"
+              placeholder="Cook Time"
               style={styles.input}
               keyboardType="numeric"
               value={newRecipe.cookTime?.toString() || ""}
@@ -168,7 +212,7 @@ const AddRecipeModal: React.FC<AddRecipeModalProps> = ({ visible, onClose, onSav
               }
             />
             <TextInput
-              placeholder="Resting Time (mins)"
+              placeholder="Resting Time"
               style={styles.input}
               keyboardType="numeric"
               value={newRecipe.restingTime?.toString() || ""}
@@ -202,14 +246,6 @@ const AddRecipeModal: React.FC<AddRecipeModalProps> = ({ visible, onClose, onSav
               onChangeText={(text) => setNewRecipe({ ...newRecipe, mealType: text })}
             />
 
-            {/* Status */}
-            <TextInput
-              placeholder="Status"
-              style={styles.input}
-              value={newRecipe.status || ""}
-              onChangeText={(text) => setNewRecipe({ ...newRecipe, status: text })}
-            />
-
             {/* Image */}
             <Button title="Pick Image" onPress={pickImage} />
             <Button title="Take Photo" onPress={takePhoto} />
@@ -226,6 +262,7 @@ const AddRecipeModal: React.FC<AddRecipeModalProps> = ({ visible, onClose, onSav
 };
 
 export default AddRecipeModal;
+
 
 const styles = StyleSheet.create({
   modalOverlay: {
