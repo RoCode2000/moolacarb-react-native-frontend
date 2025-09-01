@@ -3,9 +3,9 @@ import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { auth } from '../config/firebaseConfig';
-import { createUserWithEmailAndPassword } from "firebase/auth";
 import CheckBox from '@react-native-community/checkbox';
 import {
+    createUserWithEmailAndPassword,
     signInWithEmailAndPassword,
     signInWithCredential,
     GoogleAuthProvider,
@@ -18,6 +18,11 @@ import '../config/googleConfig';
 import { GoogleSignin } from '@react-native-google-signin/google-signin';
 import { LoginManager, AccessToken } from 'react-native-fbsdk-next';
 
+
+// type Props = {
+//   onLoginSuccess: () => void;
+// };
+
 export default function SignUpScreen() {
   const navigation = useNavigation();
   const [showEmailForm, setShowEmailForm] = useState(false);
@@ -26,41 +31,103 @@ export default function SignUpScreen() {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [acceptedTerms, setAcceptedTerms] = useState(false);
-  // Disable all sign-up buttons until terms accepted
+  const [error, setError] = useState('');
   const allDisabled = !acceptedTerms;
 
   const handleSignUp = async () => {
+
+    if (password !== confirmPassword) {
+        setError("Passwords do not match. Please check and try again.");
+        return; // stop further execution
+      }
+
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-//       console.log("User created:", userCredential.user);
+      console.log("User created:", userCredential.user);
+        console.log("New User Credentials: ", userCredential);
+      const payload = {
+            name: name,
+            email: email,
+            password: password,
+            firebaseId: userCredential.user.uid
+          };
+
+      const response = await fetch('http://10.0.2.2:8080/api/user/login', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(payload),
+            });
 
     } catch (error: any) {
 //       console.error("Error signing up:", error.code, error.message);
+        setError("This email is already registered.");
     }
   };
+
+
 
   const handleGoogleLogin = async () => {
     try {
       await GoogleSignin.hasPlayServices();
-      // uncomment this below if you want to force the user to select a google account to log in
-      // await GoogleSignin.signOut();
       const userInfo = await GoogleSignin.signIn();
-//       console.log('GoogleSignin userInfo:', userInfo);
+      console.log('GoogleSignin userInfo:', userInfo);
+
+      const email = userInfo.data.user.email;
+      if (!email) throw new Error('No email returned from Google');
+
+
+      const signInMethods = await fetchSignInMethodsForEmail(auth, email);
+
+      if (signInMethods.includes('password')) {
+        setError("This email is already registered. Please sign in using email & password or use a different email.");
+        return;
+      }
+
 
       const idToken = userInfo.data.idToken;
-      if (!idToken) {
-        throw new Error('Google Sign-In failed: no idToken returned');
-      }
-//       console.log('idToken:', idToken);
+      if (!idToken) throw new Error('Google Sign-In failed: no idToken returned');
 
       const googleCredential = GoogleAuthProvider.credential(idToken);
       await signInWithCredential(auth, googleCredential);
-//       console.log("Google login successful");
+      console.log("Google login successful");
+
+      const currentUser = auth.currentUser;
+//       if (currentUser) {
+//           console.log("This is currentUsers: ", currentUser.uid)
+//       }
+
+      const payload = {
+        idToken: idToken,
+        userId: userInfo.data.user.id,
+        email: email,
+        givenName: userInfo.data.user.givenName,
+        familyName: userInfo.data.user.familyName,
+        name: userInfo.data.user.name,
+        photoUrl: userInfo.data.user.photo,
+        firebaseId: currentUser.uid
+      };
+
+      const response = await fetch('http://10.0.2.2:8080/api/user/google-login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Backend error ${response.status}: ${errorText}`);
+      }
+
+      const data = await response.json();
+      console.log("Backend response:", data);
+
+      // onLoginSuccess();
     } catch (err) {
-//       console.error("Google login failed", err);
-      setError("Google login failed");
+      console.error("Google login / backend failed:", err);
+      setError("Google login failed. Please try again later");
     }
   };
+
 
   const handleFacebookLogin = async () => {
     try {
@@ -76,6 +143,9 @@ export default function SignUpScreen() {
       try {
 
         await signInWithCredential(auth, facebookCredential);
+        const currentUser = auth.currentUser;
+
+//         onLoginSuccess();
 //         console.log('Facebook login successful');
       } catch (error: any) {
         if (error.code === 'auth/account-exists-with-different-credential') {
@@ -109,7 +179,7 @@ export default function SignUpScreen() {
           if (existingUser) {
             await linkWithCredential(existingUser, pendingCred);
 //             console.log('Facebook successfully linked to existing account');
-            onLoginSuccess();
+//             onLoginSuccess();
           }
         } else {
           throw error;
@@ -166,6 +236,7 @@ export default function SignUpScreen() {
       >
         <Text style={[styles.socialText, { color: '#4CAF50' }]}>Sign Up with Email</Text>
       </TouchableOpacity>
+      {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
       {showEmailForm && (
         <>
@@ -302,4 +373,9 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#4CAF50',
   },
+  errorText: {
+      color: 'red',
+      marginTop: 10,
+      textAlign: 'center',
+    },
 });

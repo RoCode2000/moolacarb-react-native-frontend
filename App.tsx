@@ -1,5 +1,5 @@
 // App.tsx
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
@@ -10,19 +10,27 @@ import SignupScreen from './src/screens/SignupScreen';
 
 // Tabs (make sure these are default exports)
 import RecipeScreen from './src/screens/RecipeScreen';
+import RecipeDetailScreen from "./src/screens/RecipeDetailScreen";
 import FoodScanScreen from './src/screens/FoodScanScreen';
 import HomeScreen from './src/screens/HomeScreen';
 import ReportsScreen from './src/screens/ReportsScreen';
 import ProfileScreen from './src/screens/ProfileScreen';
+import SubscriptionTierScreen from './src/screens/SubscriptionTierScreen';
 
 
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 MaterialCommunityIcons.loadFont();
+import { auth } from './src/config/firebaseConfig';
+import { onAuthStateChanged, User } from 'firebase/auth';
+
+import { UserProvider } from "./src/context/UserContext";
+import { RecipeProvider } from './src/context/RecipeContext';
 
 export type RootStackParamList = {
   Login: undefined;
   Signup: undefined;
   Main: undefined;
+  SubscriptionTier: undefined;
 };
 
 export type TabParamList = {
@@ -85,28 +93,62 @@ function AppTabs({ onLogout }: { onLogout: () => void }) {
 
 export default function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+
+  useEffect(() => {
+      const unsubscribe = onAuthStateChanged(auth, (user: User | null) => {
+        setIsLoggedIn(!!user);
+        setLoading(false);
+      });
+
+      return unsubscribe; // cleanup listener on unmount
+    }, []);
+
+    if (loading) {
+      // You can replace this with a splash screen or loader
+      return null;
+    }
 
   return (
-    <NavigationContainer>
-      <Stack.Navigator screenOptions={{ headerShown: false }}>
-        {!isLoggedIn ? (
-          <>
-            <Stack.Screen name="Login">
-              {(props) => (
-                <LoginScreen
-                  {...props}
-                  onLoginSuccess={() => setIsLoggedIn(true)}
-                />
-              )}
-            </Stack.Screen>
-            <Stack.Screen name="Signup" component={SignupScreen} />
-          </>
-        ) : (
-          <Stack.Screen name="Main">
-            {() => <AppTabs onLogout={() => setIsLoggedIn(false)} />}
-          </Stack.Screen>
-        )}
-      </Stack.Navigator>
-    </NavigationContainer>
+    <UserProvider>
+        <RecipeProvider>
+        <NavigationContainer>
+          <Stack.Navigator screenOptions={{ headerShown: false }}>
+            {!isLoggedIn ? (
+              <>
+                <Stack.Screen name="Login">
+                  {(props) => (
+                    <LoginScreen
+                      {...props}
+                      onLoginSuccess={() => setIsLoggedIn(true)}
+                    />
+                  )}
+                </Stack.Screen>
+                <Stack.Screen name="Signup" component={SignupScreen} />
+              </>
+            ) : (
+            <>
+                  <Stack.Screen name="Main">
+                    {() => <AppTabs onLogout={() => setIsLoggedIn(false)} />}
+                  </Stack.Screen>
+
+                  <Stack.Screen
+                    name="RecipeDetailScreen"
+                    component={RecipeDetailScreen}
+                    options={{ headerShown: true, title: "Recipe Details" }}
+                  />
+
+                  <Stack.Screen
+                    name="SubscriptionTier"
+                    component={SubscriptionTierScreen}
+                    options={{ headerShown: true, title: "Subscription Tier" }}
+                  />
+                </>
+            )}
+          </Stack.Navigator>
+        </NavigationContainer>
+        </RecipeProvider>
+    </UserProvider>
   );
 }

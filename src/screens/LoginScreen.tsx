@@ -16,7 +16,7 @@ import {
     FacebookAuthProvider,
     linkWithCredential,
     fetchSignInMethodsForEmail,
-    updatePassword
+    sendPasswordResetEmail
     } from 'firebase/auth';
 import { auth } from '../config/firebaseConfig';
 import '../config/googleConfig';
@@ -27,6 +27,8 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../../App';
 
 import { LoginManager, AccessToken } from 'react-native-fbsdk-next';
+import { useUser } from "../context/UserContext";
+import { Alert } from "react-native";
 
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
@@ -45,6 +47,7 @@ const LoginScreen = ({ onLoginSuccess }: Props) => {
   const [error, setError] = useState('');
   const provider = new GoogleAuthProvider();
   const navigation = useNavigation<LoginScreenNavProp>();
+  const { setUser } = useUser();
 
   const saveUid = async () => {
     const user = auth.currentUser;
@@ -59,16 +62,36 @@ const LoginScreen = ({ onLoginSuccess }: Props) => {
 
     const handleLogin = async () => {
       try {
-          const methods = await fetchSignInMethodsForEmail(auth, email);
-//           console.log('Existing methods for email:', methods);
+        const userCred = await signInWithEmailAndPassword(auth, email, password);
+        const user = userCred.user;
 
+        console.log("UID:", user.uid);
+        console.log("Email:", user.email);
+        console.log(user);
+
+        const response = await fetch(`http://10.0.2.2:8080/api/user/me/${user.uid}`, {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json"
+          }
+        });
+
+        if (!response.ok) {
+          throw new Error("Failed to fetch user from backend");
+        }
+
+        const backendUser = await response.json();
+        console.log("Backend user:", backendUser);
+
+        setUser(backendUser);
+
+        onLoginSuccess();
         await signInWithEmailAndPassword(auth, email, password);
 //         console.log("Login successful");
         await saveUid();
         onLoginSuccess(); // This will call setIsLoggedIn(true) in App.tsx
       } catch (err: any) {
-//         console.error("Login failed", err);
-        setError(err.message); // Use existing state setter
+        setError("Unable to Sign In, Please ensure the entered Email and Password are correct");
       }
     };
 
@@ -79,6 +102,14 @@ const LoginScreen = ({ onLoginSuccess }: Props) => {
         // await GoogleSignin.signOut();
         const userInfo = await GoogleSignin.signIn();
 //         console.log('GoogleSignin userInfo:', userInfo);
+        console.log(userInfo)
+        const userEmail = userInfo.data.user.email;
+        const signInMethods = await fetchSignInMethodsForEmail(auth, userEmail);
+
+          if (signInMethods.includes('password')) {
+            setError("This email is already registered. Please sign in using email & password or use a different email.");
+            return;
+          }
 
         const idToken = userInfo.data.idToken;
         if (!idToken) {
@@ -89,6 +120,33 @@ const LoginScreen = ({ onLoginSuccess }: Props) => {
         const googleCredential = GoogleAuthProvider.credential(idToken);
         await signInWithCredential(auth, googleCredential);
 //         console.log("Google login successful");
+
+        // Payload for backend
+        const payload = {
+          idToken: idToken,
+          userId: userInfo.data.user.id,
+          email: userInfo.data.user.email,
+          givenName: userInfo.data.user.givenName,
+          familyName: userInfo.data.user.familyName,
+          name: userInfo.data.user.name,
+          photoUrl: userInfo.data.user.photo
+        };
+
+        const response = await fetch("http://10.0.2.2:8080/api/user/google-login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+
+        if (!response.ok) {
+          throw new Error("Failed to fetch/create Google user in backend");
+        }
+
+        const backendUser = await response.json();
+        console.log("Backend Google user:", backendUser);
+
+        setUser(backendUser);
+
         await saveUid();
         onLoginSuccess();
       } catch (err) {
@@ -159,6 +217,30 @@ const LoginScreen = ({ onLoginSuccess }: Props) => {
       }
     };
 
+    const handleForgotPassword = async () => {
+      if (!email) {
+//           alert("problem ah")
+        setError("Please enter your registered email first.");
+        return;
+      }
+
+      try {
+        await sendPasswordResetEmail(auth, email);
+        setError(""); // clear error if any
+        alert("Password reset email sent! Please check your inbox.");
+      } catch (err: any) {
+        console.error("Error sending reset email:", err);
+        if (err.code === "auth/user-not-found") {
+          setError("No user found with this email.");
+        } else if (err.code === "auth/invalid-email") {
+          setError("Invalid email format.");
+        } else {
+          setError("Something went wrong. Please try again.");
+        }
+      }
+    };
+
+
 
 
 
@@ -206,12 +288,13 @@ const LoginScreen = ({ onLoginSuccess }: Props) => {
           secureTextEntry
         />
       </View>
+      {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
       <TouchableOpacity style={styles.signInButton} onPress={handleLogin}>
         <Text style={styles.signInTextButton}>Sign In</Text>
       </TouchableOpacity>
 
-      <TouchableOpacity>
+      <TouchableOpacity onPress={handleForgotPassword}>
         <Text style={styles.forgotText}>Forgot password?</Text>
       </TouchableOpacity>
 
@@ -223,9 +306,16 @@ const LoginScreen = ({ onLoginSuccess }: Props) => {
 
       <Text style={styles.orText}>— or —</Text>
 
-      <TouchableOpacity>
-        <Text style={styles.guestText}>Continue as Guest</Text>
-      </TouchableOpacity>
+        <TouchableOpacity
+          onPress={() => {
+            Alert.alert(
+              "Guest Mode Coming Soon",
+              "Please sign up or log in to access MoolaCarb features."
+            );
+          }}
+        >
+          <Text style={styles.guestText}>Continue as Guest</Text>
+        </TouchableOpacity>
     </View>
   );
 };
@@ -321,6 +411,12 @@ const styles = StyleSheet.create({
     color: '#58B368',
     fontWeight: 'bold',
   },
+  errorText: {
+    color: 'red',
+    marginTop: 10,
+    textAlign: 'center',
+  },
+
 });
 
 export default LoginScreen;

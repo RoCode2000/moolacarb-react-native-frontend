@@ -1,4 +1,3 @@
-// src/screens/HomeScreen.tsx
 import React, { useEffect, useMemo, useState, useCallback } from "react";
 import { ScrollView, View, StyleSheet, ActivityIndicator, Alert, Dimensions, Text } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -9,8 +8,10 @@ import AddEditMealModal from "../components/AddEditMealModal";
 import ExerciseLog, { ExerciseEntry } from "../components/ExerciseLog";
 import { colors } from "../theme/colors";
 import { BASE_URL } from "../config/api";
+import { auth } from '../config/firebaseConfig';
 
 const W = Dimensions.get("window").width;
+
 
 // Parse "yyyy-MM-dd'T'HH:mm:ss" as LOCAL time
 function parseLocalDateTime(isoNoZone: string): Date {
