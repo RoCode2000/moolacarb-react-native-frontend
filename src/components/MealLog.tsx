@@ -13,7 +13,7 @@ type Props = {
   onAdd?: () => void;
   onEdit?: (id: string) => void;
   onDelete?: (id: string) => void;
-  title?: string; // defaults to "Today’s Meal Log"
+  title?: string;
 };
 
 export default function MealLog({ items, onAdd, onEdit, onDelete, title = "Today’s Meal Log" }: Props) {

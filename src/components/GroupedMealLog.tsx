@@ -11,7 +11,7 @@ export type MealItem = {
   id: string;
   name: string;
   kcal: number;
-  time: Date;          // full date-time
+  time: Date;
   remarks?: string;
 };
 
@@ -23,13 +23,10 @@ type Props = {
   title?: string;
 };
 
-function fmtDate(d: Date) {
-  // dd/MM
-  return d.toLocaleDateString("en-SG", { day: "2-digit", month: "2-digit" });
-}
 function fmtTime(d: Date) {
-  return d.toLocaleTimeString("en-SG", { hour: "2-digit", minute: "2-digit", hour12: false });
+  return d.toLocaleTimeString("en-SG", { hour: "2-digit", minute: "2-digit", hour12: true });
 }
+
 function dayKey(d: Date) {
   // YYYY-MM-DD (local)
   const y = d.getFullYear();
@@ -39,7 +36,7 @@ function dayKey(d: Date) {
 }
 
 export default function GroupedMealLog({
-  items, onAdd, onEdit, onDelete, title = "Meal Log"
+  items, onAdd, onEdit, onDelete, title = "Today's Meal Log"
 }: Props) {
 
   // group by day (desc), items time asc
@@ -54,8 +51,7 @@ export default function GroupedMealLog({
     const entries = Array.from(map.entries()).map(([key, arr]) => {
       arr.sort((a, b) => a.time.getTime() - b.time.getTime()); // time asc
       const [y, m, d] = key.split("-").map(Number);
-      const disp = fmtDate(new Date(y, (m - 1), d));
-      return { title: disp, key, data: arr };
+      return { key, data: arr };
     });
     entries.sort((a, b) => (a.key < b.key ? 1 : -1)); // date desc
     return entries;
@@ -86,11 +82,6 @@ export default function GroupedMealLog({
     </View>
   );
 
-  const renderSectionHeader = ({ section }: { section: SectionListData<MealItem> & { title: string } }) => (
-    <View style={styles.sectionHeader}>
-      <Text style={styles.sectionTitle}>{section.title}</Text>
-    </View>
-  );
 
   return (
     <View style={{ marginTop: 8 }}>
@@ -113,7 +104,6 @@ export default function GroupedMealLog({
           sections={sections}
           keyExtractor={(it) => it.id}
           renderItem={renderItem}
-          renderSectionHeader={renderSectionHeader}
           ItemSeparatorComponent={() => <View style={{ height: 8 }} />}
           SectionSeparatorComponent={() => <View style={{ height: 8 }} />}
           stickySectionHeadersEnabled={Platform.OS === "ios"} // android sticky can be janky
