@@ -93,11 +93,12 @@ function AppTabs({ onLogout }: { onLogout: () => void }) {
 export default function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [loading, setLoading] = useState(true);
-
+  const [firebaseUser, setFirebaseUser] = useState<User | null>(null);
 
   useEffect(() => {
       const unsubscribe = onAuthStateChanged(auth, (user: User | null) => {
-        setIsLoggedIn(!!user);
+          setFirebaseUser(user);
+//         setIsLoggedIn(!!user);
         setLoading(false);
       });
 

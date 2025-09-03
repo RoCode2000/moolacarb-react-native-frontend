@@ -69,9 +69,18 @@ const LoginScreen = ({ onLoginSuccess }: Props) => {
         const backendUser = await response.json();
         console.log("Backend user:", backendUser);
 
-        setUser(backendUser);
 
-        onLoginSuccess();
+        if (backendUser.userStatus === "A") {
+          console.log("Active");
+          setUser(backendUser);
+          onLoginSuccess();
+        } else {
+          console.log("Banned");
+          alert("This Account has been Banned");
+          auth.signOut();
+        }
+
+
       } catch (err: any) {
         setError("Unable to Sign In, Please ensure the entered Email and Password are correct");
       }
@@ -127,9 +136,17 @@ const LoginScreen = ({ onLoginSuccess }: Props) => {
         const backendUser = await response.json();
         console.log("Backend Google user:", backendUser);
 
-        setUser(backendUser);
+        if (backendUser.userStatus === "A") {
+          console.log("Active");
+          setUser(backendUser);
+          onLoginSuccess();
+        } else {
+          console.log("Banned");
+          alert("This Account has been Banned");
+          auth.signOut();
+        }
 
-        onLoginSuccess();
+
       } catch (err) {
 //         console.error("Google login failed", err);
         setError("Google login failed");
