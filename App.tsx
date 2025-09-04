@@ -16,6 +16,7 @@ import HomeScreen from './src/screens/HomeScreen';
 import ReportsScreen from './src/screens/ReportsScreen';
 import ProfileScreen from './src/screens/ProfileScreen';
 import SubscriptionTierScreen from './src/screens/SubscriptionTierScreen';
+import OnboardingScreen from "./src/screens/OnboardingScreen";
 
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 MaterialCommunityIcons.loadFont();
@@ -29,6 +30,7 @@ export type RootStackParamList = {
   Login: undefined;
   Signup: undefined;
   Main: undefined;
+  Onboarding: undefined;
   SubscriptionTier: undefined;
 };
 
@@ -125,10 +127,33 @@ export default function App() {
                     />
                   )}
                 </Stack.Screen>
-                <Stack.Screen name="Signup" component={SignupScreen} />
+                <Stack.Screen name="Signup">
+                  {(props) => (
+                    <SignupScreen
+                      {...props}
+                      onSignupSuccess={() => {
+                        // instead of logging in immediately,
+                        // send them to the onboarding flow
+                        props.navigation.replace("Onboarding");
+                      }}
+                    />
+                  )}
+                </Stack.Screen>
+
+                <Stack.Screen name="Onboarding">
+                  {(props) => (
+                    <OnboardingScreen
+                      {...props}
+                      onOnboardingComplete={() => setIsLoggedIn(true)}
+                    />
+                  )}
+                </Stack.Screen>
+
               </>
             ) : (
             <>
+
+
                   <Stack.Screen name="Main">
                     {() => <AppTabs onLogout={() => setIsLoggedIn(false)} />}
                   </Stack.Screen>
