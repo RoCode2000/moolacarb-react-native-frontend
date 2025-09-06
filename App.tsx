@@ -19,6 +19,7 @@ import SubscriptionTierScreen from './src/screens/SubscriptionTierScreen';
 import OnboardingScreen from "./src/screens/OnboardingScreen";
 import EditProfileScreen from "./src/screens/EditProfileScreen";
 
+
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 MaterialCommunityIcons.loadFont();
 import { auth } from './src/config/firebaseConfig';
