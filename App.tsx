@@ -17,6 +17,7 @@ import ReportsScreen from './src/screens/ReportsScreen';
 import ProfileScreen from './src/screens/ProfileScreen';
 import SubscriptionTierScreen from './src/screens/SubscriptionTierScreen';
 
+
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 MaterialCommunityIcons.loadFont();
 import { auth } from './src/config/firebaseConfig';
