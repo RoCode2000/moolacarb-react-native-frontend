@@ -17,6 +17,7 @@ import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import type { RootStackParamList } from "../App";
 import { useRecipes } from "../context/RecipeContext";
+import { useMemo } from "react";
 
 interface Recipe {
   recipeId: string;
@@ -127,20 +128,49 @@ const RecipeScreen: React.FC = () => {
   };
 
   // Filter recipes based on active tab
+//   const filteredRecipes =
+//     activeTab === "Favourites"
+//       ? favouriteRecipes
+//       : activeTab === "My"
+//       ? recipes.filter((r) => r.author === user?.userId)
+//       : recipes;// search
+//
+//   const searchedRecipes = filteredRecipes.filter((r) =>
+//     r.title.toLowerCase().includes(search.toLowerCase())
+//   );
+//
+//   const sortedRecipes = searchedRecipes.sort((a, b) =>
+//     sortAsc ? a.title.localeCompare(b.title) : b.title.localeCompare(a.title)
+//   );
   const filteredRecipes =
     activeTab === "Favourites"
-      ? favouriteRecipes
+      ? favouriteRecipes || []
       : activeTab === "My"
-      ? recipes.filter((r) => r.author === user?.userId)
-      : recipes;// search
+      ? (recipes || []).filter((r) => r.author === user?.userId)
+      : recipes || [];
 
-  const searchedRecipes = filteredRecipes.filter((r) =>
+  const searchedRecipes = (filteredRecipes || []).filter((r) =>
     r.title.toLowerCase().includes(search.toLowerCase())
   );
 
-  const sortedRecipes = searchedRecipes.sort((a, b) =>
+  const sortedRecipes = (searchedRecipes || []).sort((a, b) =>
     sortAsc ? a.title.localeCompare(b.title) : b.title.localeCompare(a.title)
   );
+
+  const limitedRecipes =
+    !isPremium && (sortedRecipes?.length ?? 0) > 0
+      ? [...sortedRecipes].sort(() => 0.5 - Math.random()).slice(0, 3)
+      : sortedRecipes || [];
+
+   const visibleRecipes = useMemo(() => {
+         if (isPremium) {
+           return sortedRecipes; // premium sees all
+         }
+         // free users → pick 3 random recipes
+         if (sortedRecipes.length <= 3) return sortedRecipes;
+         const shuffled = [...sortedRecipes].sort(() => Math.random() - 0.5);
+         return shuffled.slice(0, 3);
+       }, [sortedRecipes, isPremium]);
 
   const fetchFavouriteRecipes = async () => {
     if (!isPremium || !user?.userId) return;
@@ -267,7 +297,7 @@ const RecipeScreen: React.FC = () => {
       </View>
 
       <FlatList
-        data={sortedRecipes}
+        data={limitedRecipes ?? []}
         keyExtractor={(item) => item.recipeId.toString()}
         renderItem={renderRecipe}
         contentContainerStyle={{ paddingBottom: 50 }}

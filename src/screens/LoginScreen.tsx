@@ -29,9 +29,6 @@ import type { RootStackParamList } from '../../App';
 import { LoginManager, AccessToken } from 'react-native-fbsdk-next';
 import { useUser } from "../context/UserContext";
 import { Alert } from "react-native";
-
-import AsyncStorage from "@react-native-async-storage/async-storage";
-
 type Props = {
   onLoginSuccess: () => void;
 };
@@ -48,17 +45,6 @@ const LoginScreen = ({ onLoginSuccess }: Props) => {
   const provider = new GoogleAuthProvider();
   const navigation = useNavigation<LoginScreenNavProp>();
   const { setUser } = useUser();
-
-  const saveUid = async () => {
-    const user = auth.currentUser;
-    if (user?.uid) {
-      await AsyncStorage.setItem("userId", user.uid);
-      if (user.email) {
-        await AsyncStorage.setItem("email", user.email);
-      }
-    }
-  };
-
 
     const handleLogin = async () => {
       try {
@@ -83,13 +69,18 @@ const LoginScreen = ({ onLoginSuccess }: Props) => {
         const backendUser = await response.json();
         console.log("Backend user:", backendUser);
 
-        setUser(backendUser);
 
-        onLoginSuccess();
-        await signInWithEmailAndPassword(auth, email, password);
-//         console.log("Login successful");
-        await saveUid();
-        onLoginSuccess(); // This will call setIsLoggedIn(true) in App.tsx
+        if (backendUser.userStatus === "A") {
+          console.log("Active");
+          setUser(backendUser);
+          onLoginSuccess();
+        } else {
+          console.log("Banned");
+          alert("This Account has been Banned");
+          auth.signOut();
+        }
+
+
       } catch (err: any) {
         setError("Unable to Sign In, Please ensure the entered Email and Password are correct");
       }
@@ -145,10 +136,17 @@ const LoginScreen = ({ onLoginSuccess }: Props) => {
         const backendUser = await response.json();
         console.log("Backend Google user:", backendUser);
 
-        setUser(backendUser);
+        if (backendUser.userStatus === "A") {
+          console.log("Active");
+          setUser(backendUser);
+          onLoginSuccess();
+        } else {
+          console.log("Banned");
+          alert("This Account has been Banned");
+          auth.signOut();
+        }
 
-        await saveUid();
-        onLoginSuccess();
+
       } catch (err) {
 //         console.error("Google login failed", err);
         setError("Google login failed");
@@ -170,7 +168,6 @@ const LoginScreen = ({ onLoginSuccess }: Props) => {
 
           await signInWithCredential(auth, facebookCredential);
 //           console.log('Facebook login successful');
-          await saveUid();
           onLoginSuccess();
         } catch (error: any) {
           if (error.code === 'auth/account-exists-with-different-credential') {
@@ -204,7 +201,6 @@ const LoginScreen = ({ onLoginSuccess }: Props) => {
             if (existingUser) {
               await linkWithCredential(existingUser, pendingCred);
 //               console.log('Facebook successfully linked to existing account');
-              await saveUid();
               onLoginSuccess();
             }
           } else {
