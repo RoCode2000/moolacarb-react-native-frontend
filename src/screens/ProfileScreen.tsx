@@ -37,7 +37,6 @@ export default function ProfileScreen({ onLogout }: Props) {
             Name: {user.firstName} {user.lastName}
           </Text>
           <Text style={styles.info}>Email: {user.email}</Text>
-          <Text style={styles.info}>Premium: {user.premium ?? "-"}</Text>
         </>
       ) : (
         <Text style={styles.error}>

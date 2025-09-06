@@ -1,5 +1,5 @@
 // src/screens/EditProfileScreen.tsx
-import React, { useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   View,
   Text,
@@ -9,15 +9,41 @@ import {
   ScrollView,
   Alert,
   Platform,
+  ActivityIndicator,
 } from "react-native";
 import DateTimePicker from "@react-native-community/datetimepicker";
+import { useFocusEffect } from "@react-navigation/native";
 import { auth } from "../config/firebaseConfig";
 import { useUser } from "../context/UserContext";
+
+/** ===== API endpoints ===== */
+const API_HOST = "http://10.0.2.2:8080";
+const PROFILE_UPSERT = `${API_HOST}/api/user/onboarding`;
+const ME_ENDPOINT = (uid: string) => `${API_HOST}/api/user/me/${uid}`;
+
+const WEIGHT_CURRENT = (uid: string) => `${API_HOST}/api/weight/current/${uid}`;
+const WEIGHT_HISTORY = (uid: string) => `${API_HOST}/api/weight/history/${uid}`;
+const WEIGHT_ADD = (uid: string, w: number) =>
+  `${API_HOST}/api/weight/add?firebaseId=${encodeURIComponent(uid)}&weight=${encodeURIComponent(w)}`;
+
+const HEIGHT_CURRENT = (uid: string) => `${API_HOST}/api/height/current/${uid}`;
+const HEIGHT_HISTORY = (uid: string) => `${API_HOST}/api/height/history/${uid}`;
+const HEIGHT_ADD = (uid: string, h: number) =>
+  `${API_HOST}/api/height/add?firebaseId=${encodeURIComponent(uid)}&height=${encodeURIComponent(h)}`;
+
+/** Common GET options to fix 406 */
+const GET_JSON: RequestInit = {
+  method: "GET",
+  headers: { Accept: "application/json" },
+};
 
 export default function EditProfileScreen({ navigation }: any) {
   const { user, setUser } = useUser();
 
-  // Pre-fill from context (defensive: fallbacks if backend fields are missing)
+  // Prefer UID from context; fall back to Firebase auth
+  const uid = user?.firebaseId || auth.currentUser?.uid || null;
+
+  // Pre-fill from context
   const [gender, setGender] = useState<string | null>(user?.gender ?? null);
   const initialDob = useMemo(() => {
     try {
@@ -30,21 +56,19 @@ export default function EditProfileScreen({ navigation }: any) {
 
   const [exercise, setExercise] = useState<string | null>(user?.exercise ?? null);
 
-  // If your /me response doesn’t include currentWeight/currentHeight,
-  // these stay blank until the user enters something new.
-  const [weight, setWeight] = useState<string>(user?.currentWeight?.toString?.() ?? "");
-  const [height, setHeight] = useState<string>(user?.currentHeight?.toString?.() ?? "");
+  const [weight, setWeight] = useState<string>(""); // will be fetched
+  const [height, setHeight] = useState<string>(""); // will be fetched
 
   const [goal, setGoal] = useState<string | null>(user?.goals ?? null);
   const [timeframe, setTimeframe] = useState<number | null>(user?.timeframe ?? null);
 
-  // Date bounds (no future DOB; adjust min year if needed)
   const today = new Date();
   const minDate = new Date(1900, 0, 1);
   const maxDate = today;
-
-  // Android date picker visibility (iOS renders inline)
   const [showPicker, setShowPicker] = useState<boolean>(Platform.OS === "ios");
+
+  const [loading, setLoading] = useState<boolean>(false);
+  const [loadingMeasurements, setLoadingMeasurements] = useState<boolean>(false);
 
   const savingDisabled =
     !gender ||
@@ -58,51 +82,142 @@ export default function EditProfileScreen({ navigation }: any) {
   const formatDate = (d: Date) =>
     Intl.DateTimeFormat(undefined, { dateStyle: "medium" }).format(d);
 
-  const handleSave = async () => {
-    const currentUser = auth.currentUser;
-    if (!currentUser) return;
+  /** ---------- Fetch helpers ---------- */
+  const parseNumber = (v: any) => {
+    const n = Number(v);
+    return Number.isFinite(n) ? n : undefined;
+  };
+  const pickField = (obj: any, keys: string[]) => {
+    for (const k of keys) {
+      if (obj && obj[k] != null) {
+        const n = parseNumber(obj[k]);
+        if (n !== undefined) return n;
+      }
+    }
+    return undefined;
+  };
 
-    // Only send numeric values if provided
+  const loadMeasurements = async (uid: string) => {
+    setLoadingMeasurements(true);
+    try {
+      console.log("[EditProfile] uid:", uid);
+
+      // ---- Weight ----
+      let wVal: number | undefined;
+      const wResp = await fetch(WEIGHT_CURRENT(uid), GET_JSON);
+      console.log("[EditProfile] WEIGHT_CURRENT status:", wResp.status);
+      if (wResp.ok) {
+        const wJson = await wResp.json();
+        console.log("[EditProfile] WEIGHT_CURRENT json:", wJson);
+        wVal = pickField(wJson, ["weight", "value", "currentWeight"]);
+      } else {
+        console.warn("[EditProfile] WEIGHT_CURRENT failed:", await wResp.text());
+      }
+      if (wVal === undefined) {
+        const wh = await fetch(WEIGHT_HISTORY(uid), GET_JSON);
+        console.log("[EditProfile] WEIGHT_HISTORY status:", wh.status);
+        if (wh.ok) {
+          const arr = await wh.json();
+          console.log("[EditProfile] WEIGHT_HISTORY json:", arr);
+          if (Array.isArray(arr) && arr.length) {
+            // try newest last; if API returns newest-first, the first line still works
+            wVal =
+              pickField(arr[arr.length - 1], ["weight", "value"]) ??
+              pickField(arr[0], ["weight", "value"]);
+          }
+        }
+      }
+      if (wVal !== undefined) setWeight(String(wVal));
+
+      // ---- Height ----
+      let hVal: number | undefined;
+      const hResp = await fetch(HEIGHT_CURRENT(uid), GET_JSON);
+      console.log("[EditProfile] HEIGHT_CURRENT status:", hResp.status);
+      if (hResp.ok) {
+        const hJson = await hResp.json();
+        console.log("[EditProfile] HEIGHT_CURRENT json:", hJson);
+        hVal = pickField(hJson, ["height", "value", "currentHeight"]);
+      } else {
+        console.warn("[EditProfile] HEIGHT_CURRENT failed:", await hResp.text());
+      }
+      if (hVal === undefined) {
+        const hh = await fetch(HEIGHT_HISTORY(uid), GET_JSON);
+        console.log("[EditProfile] HEIGHT_HISTORY status:", hh.status);
+        if (hh.ok) {
+          const arr = await hh.json();
+          console.log("[EditProfile] HEIGHT_HISTORY json:", arr);
+          if (Array.isArray(arr) && arr.length) {
+            hVal =
+              pickField(arr[arr.length - 1], ["height", "value"]) ??
+              pickField(arr[0], ["height", "value"]);
+          }
+        }
+      }
+      if (hVal !== undefined) setHeight(String(hVal));
+    } catch (e) {
+      console.warn("[EditProfile] loadMeasurements error:", e);
+    } finally {
+      setLoadingMeasurements(false);
+    }
+  };
+
+  // Load when UID first available
+  useEffect(() => {
+    if (uid) loadMeasurements(uid);
+  }, [uid]);
+
+  // Reload on screen focus
+  useFocusEffect(
+    useCallback(() => {
+      if (uid) loadMeasurements(uid);
+    }, [uid])
+  );
+
+  /** ---------- Save ---------- */
+  const handleSave = async () => {
+    if (!uid) return;
+
     const weightNum = weight === "" ? undefined : Number(weight);
     const heightNum = height === "" ? undefined : Number(height);
 
-    const payload: any = {
-      firebaseId: currentUser.uid,
-      gender,
-      dob: dob.toISOString(),
-      exercise,
-      goal,
-      timeframe,
-    };
-    if (weightNum !== undefined) payload.weight = weightNum;
-    if (heightNum !== undefined) payload.height = heightNum;
-
+    setLoading(true);
     try {
-      const resp = await fetch("http://10.0.2.2:8080/api/user/onboarding", {
+      const profilePayload: any = {
+        firebaseId: uid,
+        gender,
+        dob: dob.toISOString(),
+        exercise,
+        goal,
+        timeframe,
+      };
+
+      const profileResp = await fetch(PROFILE_UPSERT, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify(profilePayload),
       });
+      if (!profileResp.ok) throw new Error(await profileResp.text());
 
-      if (!resp.ok) {
-        const err = await resp.text();
-        throw new Error(err || "Profile update failed");
+      if (weightNum !== undefined && !isNaN(weightNum)) {
+        await fetch(WEIGHT_ADD(uid, weightNum), { method: "POST", headers: { Accept: "application/json" } });
+      }
+      if (heightNum !== undefined && !isNaN(heightNum)) {
+        await fetch(HEIGHT_ADD(uid, heightNum), { method: "POST", headers: { Accept: "application/json" } });
       }
 
-      // Refresh user from backend so context stays in sync
-      const me = await fetch(`http://10.0.2.2:8080/api/user/me/${currentUser.uid}`);
-      if (me.ok) {
-        const backendUser = await me.json();
-        setUser(backendUser);
-      }
+      const me = await fetch(ME_ENDPOINT(uid), GET_JSON);
+      if (me.ok) setUser(await me.json());
 
       navigation.goBack();
     } catch (e: any) {
       console.error(e);
       Alert.alert("Update failed", e?.message ?? "Please try again.");
+    } finally {
+      setLoading(false);
     }
   };
 
+  /** ---------- Render ---------- */
   return (
     <ScrollView contentContainerStyle={styles.container}>
       <Text style={styles.title}>Edit Profile</Text>
@@ -121,14 +236,14 @@ export default function EditProfileScreen({ navigation }: any) {
         ))}
       </View>
 
-      {/* DOB (native picker: iOS inline, Android modal) */}
+      {/* DOB */}
       <Text style={styles.label}>Date of Birth</Text>
       {Platform.OS === "ios" ? (
         <View style={styles.pickerBox}>
           <DateTimePicker
             value={dob}
             mode="date"
-            display="inline" // iOS 14+
+            display="inline"
             maximumDate={maxDate}
             minimumDate={minDate}
             onChange={(_, selectedDate) => {
@@ -138,22 +253,18 @@ export default function EditProfileScreen({ navigation }: any) {
         </View>
       ) : (
         <>
-          <TouchableOpacity
-            style={styles.option}
-            onPress={() => setShowPicker(true)}
-          >
+          <TouchableOpacity style={styles.option} onPress={() => setShowPicker(true)}>
             <Text>{formatDate(dob)}</Text>
           </TouchableOpacity>
-
           {showPicker && (
             <DateTimePicker
               value={dob}
               mode="date"
-              display="calendar" // or "spinner"
+              display="calendar"
               maximumDate={maxDate}
               minimumDate={minDate}
               onChange={(event, selectedDate) => {
-                setShowPicker(false); // close Android modal either way
+                setShowPicker(false);
                 if (selectedDate) setDob(selectedDate);
               }}
             />
@@ -174,10 +285,14 @@ export default function EditProfileScreen({ navigation }: any) {
       ))}
 
       {/* Weight */}
-      <Text style={styles.label}>Weight (kg)</Text>
+      <View style={styles.inlineLabel}>
+        <Text style={styles.label}>Weight (kg)</Text>
+        {loadingMeasurements && <ActivityIndicator />}
+      </View>
       <TextInput
         style={styles.input}
         keyboardType="numeric"
+        inputMode="decimal"
         value={weight}
         onChangeText={setWeight}
         placeholder="e.g. 70"
@@ -188,6 +303,7 @@ export default function EditProfileScreen({ navigation }: any) {
       <TextInput
         style={styles.input}
         keyboardType="numeric"
+        inputMode="numeric"
         value={height}
         onChangeText={setHeight}
         placeholder="e.g. 173"
@@ -222,11 +338,11 @@ export default function EditProfileScreen({ navigation }: any) {
       </View>
 
       <TouchableOpacity
-        style={[styles.saveBtn, savingDisabled && { opacity: 0.5 }]}
+        style={[styles.saveBtn, (savingDisabled || loading) && { opacity: 0.5 }]}
         onPress={handleSave}
-        disabled={savingDisabled}
+        disabled={savingDisabled || loading}
       >
-        <Text style={styles.saveText}>Save</Text>
+        {loading ? <ActivityIndicator /> : <Text style={styles.saveText}>Save</Text>}
       </TouchableOpacity>
     </ScrollView>
   );
@@ -236,6 +352,13 @@ const styles = StyleSheet.create({
   container: { padding: 20, backgroundColor: "#fff" },
   title: { fontSize: 22, fontWeight: "bold", marginBottom: 20, textAlign: "center" },
   label: { fontSize: 16, fontWeight: "600", marginTop: 16, marginBottom: 8 },
+  inlineLabel: {
+    marginTop: 16,
+    marginBottom: 8,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
   row: { flexDirection: "row", justifyContent: "space-between" },
   rowWrap: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
   pill: {
