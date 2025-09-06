@@ -1,6 +1,11 @@
 import React, { useMemo } from "react";
 import {
-  View, Text, StyleSheet, SectionList, Pressable, ListRenderItem, SectionListData, Platform
+  View,
+  Text,
+  StyleSheet,
+  Pressable,
+  ListRenderItem,
+  FlatList,
 } from "react-native";
 import { colors } from "../theme/colors";
 import Pencil from "react-native-bootstrap-icons/icons/pencil";
@@ -21,41 +26,26 @@ type Props = {
   onEdit?: (id: string) => void;
   onDelete?: (id: string) => void;
   title?: string;
+  /** Hide title/total/add row when embedding in Report’s Daily tab */
+  showTopBar?: boolean; // default true
 };
 
 function fmtTime(d: Date) {
   return d.toLocaleTimeString("en-SG", { hour: "2-digit", minute: "2-digit", hour12: true });
 }
 
-function dayKey(d: Date) {
-  // YYYY-MM-DD (local)
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
-}
-
 export default function GroupedMealLog({
-  items, onAdd, onEdit, onDelete, title = "Today's Meal Log"
+  items,
+  onAdd,
+  onEdit,
+  onDelete,
+  title = "Today's Meal Log",
+  showTopBar = true,
 }: Props) {
-
-  // group by day (desc), items time asc
-  const sections = useMemo(() => {
-    const map = new Map<string, MealItem[]>();
-    for (const it of items) {
-      const key = dayKey(it.time);
-      const arr = map.get(key) ?? [];
-      arr.push(it);
-      map.set(key, arr);
-    }
-    const entries = Array.from(map.entries()).map(([key, arr]) => {
-      arr.sort((a, b) => a.time.getTime() - b.time.getTime()); // time asc
-      const [y, m, d] = key.split("-").map(Number);
-      return { key, data: arr };
-    });
-    entries.sort((a, b) => (a.key < b.key ? 1 : -1)); // date desc
-    return entries;
-  }, [items]);
+  const sorted = useMemo(
+    () => [...items].sort((a, b) => a.time.getTime() - b.time.getTime()),
+    [items]
+  );
 
   const total = useMemo(
     () => items.reduce((s, f) => s + (Number.isFinite(f.kcal) ? f.kcal : 0), 0),
@@ -66,48 +56,51 @@ export default function GroupedMealLog({
     <View style={styles.row}>
       <View style={{ flex: 1 }}>
         <Text numberOfLines={1} style={styles.name}>{item.name}</Text>
-        <Text style={styles.sub}>{fmtTime(item.time)}{item.remarks ? ` • ${item.remarks}` : ""}</Text>
+        <Text style={styles.sub}>
+          {fmtTime(item.time)}{item.remarks ? ` • ${item.remarks}` : ""}
+        </Text>
       </View>
 
       <View style={[styles.kcalPill, styles.kcalLogged]}>
         <Text style={styles.kcalTxt}>{item.kcal} kcal</Text>
       </View>
 
-      <Pressable onPress={() => onEdit?.(item.id)} style={styles.iconBtn}>
-        <Pencil width={16} height={16} color={colors.primaryBlue} />
-      </Pressable>
-      <Pressable onPress={() => onDelete?.(item.id)} style={[styles.iconBtn, { marginLeft: 8 }]}>
-        <Trash width={16} height={16} color={colors.primaryBlue} />
-      </Pressable>
+      {onEdit && (
+        <Pressable onPress={() => onEdit(item.id)} style={styles.iconBtn}>
+          <Pencil width={16} height={16} color={colors.primaryBlue} />
+        </Pressable>
+      )}
+      {onDelete && (
+        <Pressable onPress={() => onDelete(item.id)} style={[styles.iconBtn, { marginLeft: 8 }]}>
+          <Trash width={16} height={16} color={colors.primaryBlue} />
+        </Pressable>
+      )}
     </View>
   );
 
-
   return (
     <View style={{ marginTop: 8 }}>
-      {/* top header */}
-      <View style={styles.header}>
-        <Text style={styles.title}>{title}</Text>
-        <View style={styles.totalPill}><Text style={styles.totalTxt}>{total} kcal</Text></View>
-        <Pressable onPress={onAdd} style={styles.addBtn}>
-          {/* icon font ok; use text fallback for simplicity */}
-          <Plus width={18} height={18} color={colors.primaryGreen} />
-        </Pressable>
-      </View>
+      {showTopBar && (
+        <View style={styles.header}>
+          <Text style={styles.title}>{title}</Text>
+          <View style={styles.totalPill}><Text style={styles.totalTxt}>{total} kcal</Text></View>
+          {onAdd && (
+            <Pressable onPress={onAdd} style={styles.addBtn}>
+              <Plus width={18} height={18} color={colors.primaryGreen} />
+            </Pressable>
+          )}
+        </View>
+      )}
 
       {items.length === 0 ? (
-        <View style={styles.emptyCard}>
-          <Text style={{ color: colors.mute }}>No food logged yet</Text>
-        </View>
+        <Text style={{ color: colors.mute, marginBottom: 8 }}>No meal logged yet for this day.</Text>
       ) : (
-        <SectionList
-          sections={sections}
+        <FlatList
+          data={sorted}
           keyExtractor={(it) => it.id}
           renderItem={renderItem}
           ItemSeparatorComponent={() => <View style={{ height: 8 }} />}
-          SectionSeparatorComponent={() => <View style={{ height: 8 }} />}
-          stickySectionHeadersEnabled={Platform.OS === "ios"} // android sticky can be janky
-          scrollEnabled={false}
+          scrollEnabled={false} // parent ScrollView handles scrolling
         />
       )}
     </View>
@@ -124,9 +117,6 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primaryBlue, alignItems: "center", justifyContent: "center"
   },
 
-  sectionHeader: { paddingVertical: 6, paddingHorizontal: 4 },
-  sectionTitle: { color: colors.primaryBlue, fontWeight: "800" },
-
   row: {
     flexDirection: "row", alignItems: "center",
     backgroundColor: colors.bgPrimary, borderRadius: 12, borderWidth: 1, borderColor: colors.mute,
@@ -139,13 +129,9 @@ const styles = StyleSheet.create({
   kcalLogged: { backgroundColor: colors.bgLightest },
   kcalTxt: { color: colors.primaryBlue, fontWeight: "800" },
 
-  emptyCard: {
-    backgroundColor: colors.bgPrimary, borderRadius: 12, borderWidth: 1, borderColor: colors.mute,
-    paddingVertical: 14, alignItems: "center"
-  },
   iconBtn: {
     width: 28, height: 28, borderRadius: 14,
     backgroundColor: colors.bgPrimary, borderWidth: 1, borderColor: colors.mute,
     alignItems: "center", justifyContent: "center"
-  }
+  },
 });

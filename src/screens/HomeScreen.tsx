@@ -1,6 +1,5 @@
 import React, { useEffect, useMemo, useState, useCallback } from "react";
 import { ScrollView, View, StyleSheet, ActivityIndicator, Alert, Dimensions, Text } from "react-native";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import CalorieGoal from "../components/CalorieGoal";
 import MealRecom from "../components/MealRecom";
 import GroupedMealLog, { MealItem } from "../components/GroupedMealLog";
@@ -8,83 +7,73 @@ import AddEditMealModal from "../components/AddEditMealModal";
 import ExerciseLog, { ExerciseEntry } from "../components/ExerciseLog";
 import { colors } from "../theme/colors";
 import { BASE_URL } from "../config/api";
-import { auth } from '../config/firebaseConfig';
+import { auth } from "../config/firebaseConfig";
+import { useUser } from "../context/UserContext";
 
 const W = Dimensions.get("window").width;
 
+const recs = [
+  { id: "1", name: "Grilled Chicken", kcal: 320 },
+  { id: "2", name: "Salad", kcal: 180 },
+  { id: "3", name: "Tomyum Fried Rice", kcal: 480 },
+];
 
-// Parse "yyyy-MM-dd'T'HH:mm:ss" as LOCAL time
-function parseLocalDateTime(isoNoZone: string): Date {
-  const m = isoNoZone.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})$/);
-  if (!m) return new Date(isoNoZone);
-  const [_, y, mo, d, h, mi, s] = m.map(Number);
-  return new Date(y, mo - 1, d, h, mi, s);
+/** Accepts "YYYY-MM-DDTHH:mm:ss" OR "YYYY-MM-DD HH:mm:ss" and returns a *local* Date */
+function parseLocalDateTime(s: string): Date {
+  const m = s.match(/^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2}):(\d{2})$/);
+  if (!m) return new Date(s); // fallback
+  const [_, y, mo, d, h, mi, se] = m.map(Number);
+  return new Date(y, mo - 1, d, h, mi, se); // local wall time
 }
 
-function isSameLocalDay(a: Date, b: Date) {
-  return (
-    a.getFullYear() === b.getFullYear() &&
-    a.getMonth() === b.getMonth() &&
-    a.getDate() === b.getDate()
-  );
+function startOfDay(d: Date) {
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate(), 0, 0, 0, 0);
+}
+function endOfDay(d: Date) {
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1, 0, 0, 0, 0);
 }
 
 export default function HomeScreen() {
-  const [userId, setUserId] = useState<string | null>(null);
+  const { user } = useUser();
+  const userId = user?.firebaseId ?? auth.currentUser?.uid ?? null;
+
   const [items, setItems] = useState<MealItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Add/Edit modal state
   const [showModal, setShowModal] = useState(false);
   const [editItem, setEditItem] = useState<MealItem | null>(null);
 
-  // Load UID from AsyncStorage (set during login)
-  useEffect(() => {
-    (async () => {
-      const uid = await AsyncStorage.getItem("userId");
-      setUserId(uid);
-    })();
-  }, []);
-
   const fetchMealLogs = useCallback(async () => {
     if (!userId) return;
-
     setLoading(true);
     setError(null);
-
     try {
       const url = `${BASE_URL}/api/meallogs/by-firebase/${encodeURIComponent(userId)}`;
-      console.log("GET", url, "UID:", userId);
-
       const res = await fetch(url);
-      const text = await res.text();
-      console.log("HTTP", res.status, text);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
-      if (!res.ok) throw new Error(text || `HTTP ${res.status}`);
-
-      const data = JSON.parse(text) as Array<{
+      type ApiMeal = {
         mealLogId: number;
         foodsConsumed: string;
         calories: number;
         remarks?: string;
-        timeConsumed: string; // "yyyy-MM-dd'T'HH:mm:ss"
-      }>;
+        timeConsumed: string; // "YYYY-MM-DDTHH:mm:ss" or "YYYY-MM-DD HH:mm:ss"
+      };
 
-      const mapped: MealItem[] = data.map((m) => ({
+      const data: ApiMeal[] = await res.json();
+
+      const mapped: MealItem[] = data.map(m => ({
         id: String(m.mealLogId),
         name: m.foodsConsumed ?? "(Unnamed)",
         kcal: Number(m.calories ?? 0),
         remarks: m.remarks ?? undefined,
-        time: parseLocalDateTime(m.timeConsumed), // 👈 local, no TZ shift
+        time: parseLocalDateTime(m.timeConsumed),
       }));
 
-      // Sort desc by time (latest first) so "today log" is naturally ordered
       mapped.sort((a, b) => b.time.getTime() - a.time.getTime());
-
       setItems(mapped);
     } catch (err: any) {
-      console.log("NETWORK ERR:", err);
       setError(String(err?.message ?? err));
     } finally {
       setLoading(false);
@@ -92,18 +81,24 @@ export default function HomeScreen() {
   }, [userId]);
 
   useEffect(() => {
+    if (!userId) {
+      setItems([]);
+      return;
+    }
     fetchMealLogs();
-  }, [fetchMealLogs]);
+  }, [userId, fetchMealLogs]);
 
   const handleAdd = () => {
     setEditItem(null);
     setShowModal(true);
   };
+
   const handleEdit = (id: string) => {
     const it = items.find((x) => x.id === id) ?? null;
     setEditItem(it);
     setShowModal(true);
   };
+
   const handleDelete = async (id: string) => {
     Alert.alert("Delete meal", "Are you sure you want to delete this entry?", [
       { text: "Cancel", style: "cancel" },
@@ -123,20 +118,12 @@ export default function HomeScreen() {
     ]);
   };
 
-  // Hardcoded recommendations (today)
-  const recs = useMemo(
-    () => [
-      { id: "1", name: "Grilled Chicken", kcal: 320 },
-      { id: "2", name: "Salad", kcal: 180 },
-      { id: "3", name: "Tomyum Fried Rice", kcal: 480 },
-    ],
-    []
-  );
-
-  // Today-only view
+  // Robust “today” filter using start/end-of-day
   const todayItems = useMemo(() => {
     const now = new Date();
-    return items.filter((it) => isSameLocalDay(it.time, now));
+    const start = startOfDay(now);
+    const end = endOfDay(now);
+    return items.filter((it) => it.time >= start && it.time < end);
   }, [items]);
 
   const consumedToday = useMemo(
@@ -145,7 +132,7 @@ export default function HomeScreen() {
   );
 
   const goal = 2000;
-  const exercisesToday: ExerciseEntry[] = []; // empty state for now
+  const exercisesToday: ExerciseEntry[] = [];
 
   return (
     <ScrollView style={{ flex: 1, backgroundColor: colors.bgPrimary }} contentContainerStyle={{ flexGrow: 1 }}>
@@ -158,21 +145,23 @@ export default function HomeScreen() {
           <ActivityIndicator />
         ) : error ? (
           <Text style={{ color: "red", marginBottom: 8 }}>{error}</Text>
-        ) : todayItems.length === 0 ? (
-          <Text style={{ color: colors.mute, marginBottom: 8 }}>No meal logged yet.</Text>
         ) : (
-          <GroupedMealLog items={todayItems} onAdd={handleAdd} onEdit={handleEdit} onDelete={handleDelete} />
+          <GroupedMealLog
+            items={todayItems}
+            onAdd={handleAdd}
+            onEdit={handleEdit}
+            onDelete={handleDelete}
+          />
         )}
 
-        <Text style={styles.sectionTitle}>Today&apos;s Exercise Log</Text>
+        <Text style={styles.sectionTitle}>Today's Exercise Log</Text>
         {exercisesToday.length === 0 ? (
-          <Text style={{ color: colors.mute, marginBottom: 8 }}>No exercise logged yet.</Text>
+          <Text style={{ color: colors.mute, marginBottom: 8 }}>No exercise logged yet for today.</Text>
         ) : (
           <ExerciseLog items={exercisesToday} onAdd={() => {}} onEdit={() => {}} onDelete={() => {}} />
         )}
       </View>
 
-      {/* Add / Edit modal */}
       {userId && (
         <AddEditMealModal
           visible={showModal}

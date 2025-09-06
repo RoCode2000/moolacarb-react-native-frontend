@@ -1,4 +1,3 @@
-// src/components/AddEditMealModal.tsx
 import React, { useState, useEffect } from "react";
 import {
   Modal, View, Text, TextInput, Pressable, StyleSheet, Platform, Alert
@@ -10,13 +9,13 @@ type Props = {
   visible: boolean;
   onClose: () => void;
   onSaved: () => void;
-  userId: string;  // Firebase UID
-  baseUrl: string; // e.g. http://localhost:8080
+  userId: string;
+  baseUrl: string;
   initial?: {
     id: string;
     name: string;
     kcal: number;
-    time: Date;          // <-- just a Date here
+    time: Date;
     remarks?: string;
   } | null;
 };
@@ -32,21 +31,40 @@ export default function AddEditMealModal({
   const [dt, setDt] = useState<Date>(new Date());
   const [saving, setSaving] = useState(false);
 
-  // Single-trigger pickers
-  const [showPicker, setShowPicker] = useState(false);      // iOS (datetime) / Android (date step)
-  const [showTimeStep, setShowTimeStep] = useState(false);  // Android only (time step)
+  // iOS (single step) / Android (date -> time two steps)
+  const [showPicker, setShowPicker] = useState(false);
+  const [showTimeStep, setShowTimeStep] = useState(false);
 
-  // Normalize to a true "local wall time" Date (prevents hidden UTC offset weirdness)
+
+  // Normalize to a clean "local" Date (no ms)
   const normalizeLocal = (d: Date) =>
     new Date(d.getFullYear(), d.getMonth(), d.getDate(), d.getHours(), d.getMinutes(), d.getSeconds(), 0);
 
+  // Spring expects LocalDateTime in ISO with 'T', no timezone/offset:
+  // e.g. "2025-09-06T13:05:00"  (NO trailing 'Z')
+  const formatLocalForServerT = (d: Date) => {
+    const pad = (n: number) => String(n).padStart(2, "0");
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+  };
+
+  const fmtLocalDateTime = (d: Date) =>
+    d.toLocaleString("en-SG", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: true,
+      // NOTE: no explicit timeZone override here
+    });
+
   useEffect(() => {
     if (!visible) return;
+
     setName(initial?.name ?? "");
     setKcal(initial?.kcal != null ? String(initial.kcal) : "");
     setRemarks(initial?.remarks ?? "");
 
-    // If the caller (HomeScreen) parsed as local, this will preserve the exact wall time.
     const seed = initial?.time ?? new Date();
     setDt(normalizeLocal(seed));
 
@@ -54,27 +72,7 @@ export default function AddEditMealModal({
     setShowTimeStep(false);
   }, [visible, initial]);
 
-  function toIsoNoZ(d: Date) {
-    const pad = (n:number) => String(n).padStart(2,"0");
-    const y = d.getFullYear(), m = pad(d.getMonth()+1), day = pad(d.getDate());
-    const h = pad(d.getHours()), min = pad(d.getMinutes()), s = pad(d.getSeconds());
-    return `${y}-${m}-${day}T${h}:${min}:${s}`;
-  }
-
-
-  function fmtLocalDateTime(d: Date) {
-    return d.toLocaleString("en-SG", {
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-      hour12: true,
-      timeZone: "Asia/Singapore",
-    });
-  }
-
-  // iOS: single datetime picker
+  /** ===================== Pickers ===================== **/
   const onChangeIOS = (_e: DateTimePickerEvent, val?: Date) => {
     if (val) setDt(normalizeLocal(val));
   };
@@ -84,18 +82,16 @@ export default function AddEditMealModal({
     if (e.type !== "set" || !val) return;
     const merged = new Date(dt);
     merged.setFullYear(val.getFullYear(), val.getMonth(), val.getDate());
-    setDt(merged);
+    setDt(normalizeLocal(merged));
     setShowTimeStep(true);
   };
 
   const onChangeAndroidTime = (e: DateTimePickerEvent, val?: Date) => {
     setShowTimeStep(false);
     if (e.type !== "set" || !val) return;
-
     const merged = new Date(dt);
     merged.setHours(val.getHours(), val.getMinutes(), 0, 0);
-
-    setDt(merged);
+    setDt(normalizeLocal(merged));
   };
 
   const openDateTimePicker = () => {
@@ -113,17 +109,15 @@ export default function AddEditMealModal({
       foodsConsumed: name.trim(),
       calories: Number(kcal) || 0,
       remarks: remarks.trim() || null,
-      timeConsumed: toIsoNoZ(dt),
+      timeConsumed: formatLocalForServerT(dt),
     };
 
     try {
       setSaving(true);
 
       const url = isEdit && initial
-        ? `${baseUrl}/api/meallogs/${initial.id}`
+        ? `${baseUrl}/api/meallogs/${encodeURIComponent(initial.id)}`
         : `${baseUrl}/api/meallogs/by-firebase/${encodeURIComponent(userId)}`;
-
-      console.log("SAVE", isEdit ? "PUT" : "POST", url, body);
 
       const res = await fetch(url, {
         method: isEdit ? "PUT" : "POST",
@@ -132,7 +126,6 @@ export default function AddEditMealModal({
       });
 
       const text = await res.text();
-      console.log("SAVE status:", res.status, text);
       if (!res.ok) throw new Error(text || `HTTP ${res.status}`);
 
       onSaved();
@@ -151,7 +144,7 @@ export default function AddEditMealModal({
         <View style={styles.sheet}>
           <Text style={styles.title}>{isEdit ? "Edit Meal" : "Add Meal"}</Text>
 
-          <Text style={styles.label}>Food name</Text>
+          <Text style={styles.label}>Food Name</Text>
           <TextInput
             value={name}
             onChangeText={setName}
@@ -159,7 +152,7 @@ export default function AddEditMealModal({
             style={styles.input}
           />
 
-          <Text style={styles.label}>Estimated kcal</Text>
+          <Text style={styles.label}>Estimated Calories (kcal)</Text>
           <TextInput
             value={kcal}
             onChangeText={setKcal}
@@ -168,11 +161,11 @@ export default function AddEditMealModal({
             style={styles.input}
           />
 
-          <Text style={styles.label}>Remarks</Text>
+          <Text style={styles.label}>Remarks (optional)</Text>
           <TextInput
             value={remarks}
             onChangeText={setRemarks}
-            placeholder="optional"
+            placeholder="e.g. 2 pieces, lunch, etc."
             style={styles.input}
           />
 
@@ -183,7 +176,6 @@ export default function AddEditMealModal({
             </Pressable>
           </View>
 
-          {/* iOS: single datetime picker */}
           {showPicker && Platform.OS === "ios" && (
             <DateTimePicker
               value={dt}
@@ -193,7 +185,6 @@ export default function AddEditMealModal({
             />
           )}
 
-          {/* Android: date then time */}
           {showPicker && Platform.OS === "android" && (
             <DateTimePicker
               value={dt}
@@ -206,7 +197,7 @@ export default function AddEditMealModal({
             <DateTimePicker
               value={dt}
               mode="time"
-              is24Hour={false}       // AM/PM clock on Android
+              is24Hour={false}
               display="default"
               onChange={onChangeAndroidTime}
             />
