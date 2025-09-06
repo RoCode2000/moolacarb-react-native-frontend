@@ -17,6 +17,7 @@ import ReportsScreen from './src/screens/ReportsScreen';
 import ProfileScreen from './src/screens/ProfileScreen';
 import SubscriptionTierScreen from './src/screens/SubscriptionTierScreen';
 import OnboardingScreen from "./src/screens/OnboardingScreen";
+import EditProfileScreen from "./src/screens/EditProfileScreen";
 
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 MaterialCommunityIcons.loadFont();
@@ -168,6 +169,12 @@ export default function App() {
                     name="SubscriptionTier"
                     component={SubscriptionTierScreen}
                     options={{ headerShown: true, title: "Subscription Tier" }}
+                  />
+
+                  <Stack.Screen
+                    name="EditProfile"
+                    component={EditProfileScreen}
+                    options={{ title: "Edit Profile" }}
                   />
                 </>
             )}

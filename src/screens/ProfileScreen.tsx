@@ -50,13 +50,12 @@ export default function ProfileScreen({ onLogout }: Props) {
         <Text style={styles.optionText}>Subscription Tier</Text>
       </TouchableOpacity>
 
-      <TouchableOpacity style={styles.optionButton}>
-        <Text style={styles.optionText}>My Recipe</Text>
-      </TouchableOpacity>
-
-      <TouchableOpacity style={styles.optionButton}>
-        <Text style={styles.optionText}>Notification Preference</Text>
-      </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.optionButton}
+          onPress={() => navigation.navigate("EditProfile")}
+        >
+          <Text style={styles.optionText}>Edit Profile</Text>
+        </TouchableOpacity>
 
       {/* Sign Out */}
       <TouchableOpacity style={styles.signOutButton} onPress={handleSignOut}>
