@@ -105,7 +105,7 @@ export default function EditProfileScreen({ navigation }: any) {
       // ---- Weight ----
       let wVal: number | undefined;
       const wResp = await fetch(WEIGHT_CURRENT(uid), GET_JSON);
-      console.log("[EditProfile] WEIGHT_CURRENT status:", wResp.status);
+//       console.log("[EditProfile] WEIGHT_CURRENT status:", wResp.status);
       if (wResp.ok) {
         const wJson = await wResp.json();
         console.log("[EditProfile] WEIGHT_CURRENT json:", wJson);
@@ -162,9 +162,9 @@ export default function EditProfileScreen({ navigation }: any) {
   };
 
   // Load when UID first available
-  useEffect(() => {
-    if (uid) loadMeasurements(uid);
-  }, [uid]);
+//   useEffect(() => {
+//     if (uid) loadMeasurements(uid);
+//   }, [uid]);
 
   // Reload on screen focus
   useFocusEffect(
