@@ -1,49 +1,95 @@
 import React, { useEffect, useMemo, useState, useCallback } from "react";
-import { ScrollView, View, StyleSheet, ActivityIndicator, Alert, Dimensions, Text } from "react-native";
+import {
+  ScrollView,
+  View,
+  StyleSheet,
+  ActivityIndicator,
+  Alert,
+  Dimensions,
+  Text,
+} from "react-native";
 import CalorieGoal from "../components/CalorieGoal";
 import MealRecom from "../components/MealRecom";
 import GroupedMealLog, { MealItem } from "../components/GroupedMealLog";
 import AddEditMealModal from "../components/AddEditMealModal";
-import ExerciseLog, { ExerciseEntry } from "../components/ExerciseLog";
 import { colors } from "../theme/colors";
 import { BASE_URL } from "../config/api";
 import { auth } from "../config/firebaseConfig";
 import { useUser } from "../context/UserContext";
+import { useNavigation } from "@react-navigation/native";
 
 const W = Dimensions.get("window").width;
 
-const recs = [
-  { id: "1", name: "Grilled Chicken", kcal: 320 },
-  { id: "2", name: "Salad", kcal: 180 },
-  { id: "3", name: "Tomyum Fried Rice", kcal: 480 },
-];
-
-/** Accepts "YYYY-MM-DDTHH:mm:ss" OR "YYYY-MM-DD HH:mm:ss" and returns a *local* Date */
-function parseLocalDateTime(s: string): Date {
+/** Accepts "YYYY-MM-DDTHH:mm:ss" OR "YYYY-MM-DD HH:mm:ss" and returns a local Date */
+function parseLocalDateTime(s: string): Date | null {
   const m = s.match(/^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2}):(\d{2})$/);
-  if (!m) return new Date(s); // fallback
+  if (!m) return null;
   const [_, y, mo, d, h, mi, se] = m.map(Number);
-  return new Date(y, mo - 1, d, h, mi, se); // local wall time
+  return new Date(y, mo - 1, d, h, mi, se);
 }
 
 function startOfDay(d: Date) {
   return new Date(d.getFullYear(), d.getMonth(), d.getDate(), 0, 0, 0, 0);
 }
+
 function endOfDay(d: Date) {
   return new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1, 0, 0, 0, 0);
 }
 
+// Reusable function to fetch recipe data
+const fetchRecipeData = async (recipeId: string) => {
+  const tryFetch = async (path: string) => {
+    const res = await fetch(`${BASE_URL}${path}`);
+    if (!res.ok) throw new Error(String(res.status));
+    return res.json();
+  };
+
+  try {
+    let data: any | null = await tryFetch(`/api/recipes/${encodeURIComponent(recipeId)}`);
+    return data;
+  } catch (e) {
+    let data: any | null = await tryFetch(`/api/recipe/${encodeURIComponent(recipeId)}`);
+    return data;
+  }
+};
+
+// A small helper to normalize a local Date
+const normalizeLocal = (d: Date) =>
+  new Date(
+    d.getFullYear(),
+    d.getMonth(),
+    d.getDate(),
+    d.getHours(),
+    d.getMinutes(),
+    d.getSeconds(),
+    0
+  );
+
+/** Shape used by AddEditMealModal.initial (id is optional) */
+type ModalInitial = {
+  id?: string;
+  name: string;
+  kcal: number;
+  time: Date;
+  remarks?: string;
+};
+
 export default function HomeScreen() {
   const { user } = useUser();
   const userId = user?.firebaseId ?? auth.currentUser?.uid ?? null;
+  const navigation = useNavigation<any>();
 
   const [items, setItems] = useState<MealItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [dailyTarget, setDailyTarget] = useState<number>(0);
+  const [recs, setRecs] = useState<{ id: string; name: string; kcal: number; img?: string | null }[]>([]);
 
   const [showModal, setShowModal] = useState(false);
-  const [editItem, setEditItem] = useState<MealItem | null>(null);
+  // Store a draft for the modal, not necessarily an existing item (id optional)
+  const [draft, setDraft] = useState<ModalInitial | null>(null);
 
+  // ---- Load meal logs ------------------------------------------------------
   const fetchMealLogs = useCallback(async () => {
     if (!userId) return;
     setLoading(true);
@@ -58,18 +104,21 @@ export default function HomeScreen() {
         foodsConsumed: string;
         calories: number;
         remarks?: string;
-        timeConsumed: string; // "YYYY-MM-DDTHH:mm:ss" or "YYYY-MM-DD HH:mm:ss"
+        timeConsumed: string;
       };
 
       const data: ApiMeal[] = await res.json();
 
-      const mapped: MealItem[] = data.map(m => ({
-        id: String(m.mealLogId),
-        name: m.foodsConsumed ?? "(Unnamed)",
-        kcal: Number(m.calories ?? 0),
-        remarks: m.remarks ?? undefined,
-        time: parseLocalDateTime(m.timeConsumed),
-      }));
+      const mapped: MealItem[] = data.map((m) => {
+        const t = parseLocalDateTime(m.timeConsumed) ?? new Date(); // fallback to now if parsing fails
+        return {
+          id: String(m.mealLogId),
+          name: m.foodsConsumed ?? "(Unnamed)",
+          kcal: Number(m.calories ?? 0),
+          remarks: m.remarks ?? undefined,
+          time: t,
+        };
+      });
 
       mapped.sort((a, b) => b.time.getTime() - a.time.getTime());
       setItems(mapped);
@@ -88,14 +137,87 @@ export default function HomeScreen() {
     fetchMealLogs();
   }, [userId, fetchMealLogs]);
 
+  // ---- Compute today's totals ---------------------------------------------
+  const todayItems = useMemo(() => {
+    const now = new Date();
+    const start = startOfDay(now);
+    const end = endOfDay(now);
+    return items.filter((it) => it.time >= start && it.time < end);
+  }, [items]);
+
+  const consumedToday = useMemo(
+    () => todayItems.reduce((s, f) => s + (Number.isFinite(f.kcal) ? f.kcal : 0), 0),
+    [todayItems]
+  );
+
+  // ---- Fetch daily goal first ---------------------------------------------
+  useEffect(() => {
+    if (!userId) return;
+    (async () => {
+      try {
+        const res = await fetch(`${BASE_URL}/api/calorie-goal/today?firebaseId=${encodeURIComponent(userId)}`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        if (typeof data?.dailyTarget === "number") {
+          setDailyTarget(Math.round(data.dailyTarget));
+        } else {
+          setDailyTarget(0);
+        }
+      } catch {
+        setDailyTarget(0);
+      }
+    })();
+  }, [userId]);
+
+  // ---- Fetch 3 meal recommendations (approx to daily target) ---------------
+  useEffect(() => {
+    if (!userId) return;
+    (async () => {
+      try {
+        const url = `${BASE_URL}/api/calorie-goal/recommendations?firebaseId=${encodeURIComponent(userId)}&count=3`;
+        const res = await fetch(url);
+        if (!res.ok) {
+          const txt = await res.text().catch(() => "");
+          throw new Error(`HTTP ${res.status}${txt ? ` - ${txt}` : ""}`);
+        }
+        const data = await res.json();
+        setRecs(
+          (Array.isArray(data) ? data : []).map((r: any) => ({
+            id: String(r.id),
+            name: r.title,
+            kcal: Number(r.kcal ?? r.calories ?? 0),
+            img: r.imageLink ?? null,
+          }))
+        );
+      } catch (e) {
+        console.log("recs error", e);
+        setRecs([]);
+      }
+    })();
+  }, [userId]);
+
+  // ---- UI handlers ---------------------------------------------------------
   const handleAdd = () => {
-    setEditItem(null);
+    // fresh draft with "now" as default time
+    setDraft({
+      name: "",
+      kcal: 0,
+      time: normalizeLocal(new Date()),
+      remarks: "",
+    });
     setShowModal(true);
   };
 
   const handleEdit = (id: string) => {
-    const it = items.find((x) => x.id === id) ?? null;
-    setEditItem(it);
+    const found = items.find((x) => x.id === id);
+    if (!found) return;
+    setDraft({
+      id: found.id,
+      name: found.name,
+      kcal: found.kcal,
+      time: normalizeLocal(found.time),
+      remarks: found.remarks,
+    });
     setShowModal(true);
   };
 
@@ -118,47 +240,64 @@ export default function HomeScreen() {
     ]);
   };
 
-  // Robust “today” filter using start/end-of-day
-  const todayItems = useMemo(() => {
-    const now = new Date();
-    const start = startOfDay(now);
-    const end = endOfDay(now);
-    return items.filter((it) => it.time >= start && it.time < end);
-  }, [items]);
+  const handleRecipeCardPress = (recipe: {
+    id: string;
+    name: string;
+    kcal: number;
+    img?: string | null;
+  }) => {
+    Alert.alert("What would you like to do?", recipe.name, [
+      {
+        text: "View Recipe",
+        onPress: () => {
+          navigation.navigate("RecipeDetailScreen", {
+            recipeId: recipe.id,
+          });
+        },
+      },
+      {
+        text: "Add to today’s meal log",
+        onPress: async () => {
+          try {
+            const data = await fetchRecipeData(recipe.id);
 
-  const consumedToday = useMemo(
-    () => todayItems.reduce((s, f) => s + (Number.isFinite(f.kcal) ? f.kcal : 0), 0),
-    [todayItems]
-  );
+            const draftFromRecipe: ModalInitial = {
+              // no id here -> modal will POST (add), not PUT (edit)
+              name: data?.title ?? recipe.name,
+              kcal: Number(data?.calories ?? recipe.kcal ?? 0),
+              time: normalizeLocal(new Date()), // "today" by default; user can change in modal
+              remarks: data?.remarks ?? "",
+            };
 
-  const goal = 2000;
-  const exercisesToday: ExerciseEntry[] = [];
+            setDraft(draftFromRecipe);
+            setShowModal(true);
+          } catch (e: any) {
+            console.error("Add to log failed", e);
+            Alert.alert("Couldn’t load recipe", e?.message ?? "Please try again.");
+          }
+        },
+      },
+      { text: "Cancel", style: "cancel" },
+    ]);
+  };
 
   return (
     <ScrollView style={{ flex: 1, backgroundColor: colors.bgPrimary }} contentContainerStyle={{ flexGrow: 1 }}>
       <View style={styles.canvas}>
-        <CalorieGoal consumed={consumedToday} goal={goal} />
+        <CalorieGoal consumed={consumedToday} goal={dailyTarget} />
 
-        <MealRecom width={W} items={recs} />
+        {recs.length > 0 ? (
+          <MealRecom width={W - 32} items={recs} onPressCard={handleRecipeCardPress} />
+        ) : (
+          <Text style={{ color: colors.mute, marginBottom: 6 }}>No meal recommendations yet.</Text>
+        )}
 
         {loading ? (
           <ActivityIndicator />
         ) : error ? (
-          <Text style={{ color: "red", marginBottom: 8 }}>{error}</Text>
+          <Text style={{ color: "red", marginBottom: 8 }}>Something went wrong! Please try again.</Text>
         ) : (
-          <GroupedMealLog
-            items={todayItems}
-            onAdd={handleAdd}
-            onEdit={handleEdit}
-            onDelete={handleDelete}
-          />
-        )}
-
-        <Text style={styles.sectionTitle}>Today's Exercise Log</Text>
-        {exercisesToday.length === 0 ? (
-          <Text style={{ color: colors.mute, marginBottom: 8 }}>No exercise logged yet for today.</Text>
-        ) : (
-          <ExerciseLog items={exercisesToday} onAdd={() => {}} onEdit={() => {}} onDelete={() => {}} />
+          <GroupedMealLog items={todayItems} onAdd={handleAdd} onEdit={handleEdit} onDelete={handleDelete} />
         )}
       </View>
 
@@ -169,7 +308,7 @@ export default function HomeScreen() {
           onSaved={fetchMealLogs}
           userId={userId}
           baseUrl={BASE_URL}
-          initial={editItem}
+          initial={draft} // <-- optional id; modal decides POST vs PUT
         />
       )}
     </ScrollView>

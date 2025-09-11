@@ -1,5 +1,5 @@
-// RecipeDetailScreen.tsx
-import React, { useState } from "react";
+// src/screens/RecipeDetailScreen.tsx
+import React, { useEffect, useMemo, useState } from "react";
 import {
   View,
   Text,
@@ -11,8 +11,12 @@ import {
 import Ionicons from "react-native-vector-icons/Ionicons";
 import { colors } from "../theme/colors";
 import type { RouteProp } from "@react-navigation/native";
-import type { RootStackParamList } from "../App";
 import { useRecipes } from "../context/RecipeContext";
+import { BASE_URL } from "../config/api";
+
+type RootStackParamList = {
+  RecipeDetailScreen: { recipeId: string };
+};
 
 type RecipeDetailScreenRouteProp = RouteProp<
   RootStackParamList,
@@ -23,15 +27,80 @@ interface Props {
   route: RecipeDetailScreenRouteProp;
 }
 
+type RecipeDTO = {
+  recipeId: string;
+  title: string;
+  ingredients: string;
+  instructions: string;
+  calories?: number;
+  protein?: number;
+  carbohydrates?: number;
+  fat?: number;
+  saturatedFat?: number;
+  sodium?: number;
+  cholesterol?: number;
+  potassium?: number;
+  serving?: number;
+  prepTime?: number;
+  cookTime?: number;
+  restingTime?: number;
+  cuisine?: string;
+  mealType?: string;
+  author?: string;
+  overallRating?: number;
+  description?: string;
+  imageLink?: string | null;
+  imageBinary?: string | null; // base64
+};
+
 const RecipeDetailScreen: React.FC<Props> = ({ route }) => {
   const { recipeId } = route.params;
   const { getRecipe } = useRecipes();
-  const recipe = getRecipe(recipeId);
+  const recipeFromCtx = getRecipe?.(recipeId) as RecipeDTO | undefined;
+
+  const [remote, setRemote] = useState<RecipeDTO | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  // if not in context, fetch from backend
+  useEffect(() => {
+    if (recipeFromCtx) {
+      setRemote(null);
+      return;
+    }
+    let alive = true;
+    (async () => {
+      try {
+        setLoading(true);
+        // Try plural, then singular as fallback (matches your backend variants)
+        const tryFetch = async (path: string) => {
+          const res = await fetch(`${BASE_URL}${path}`);
+          if (!res.ok) throw new Error(String(res.status));
+          return res.json();
+        };
+        let data: RecipeDTO | null = null;
+        try {
+          data = await tryFetch(`/api/recipes/${encodeURIComponent(recipeId)}`);
+        } catch {
+          data = await tryFetch(`/api/recipe/${encodeURIComponent(recipeId)}`);
+        }
+        if (alive) setRemote(data ?? null);
+      } catch {
+        if (alive) setRemote(null);
+      } finally {
+        if (alive) setLoading(false);
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [recipeId, recipeFromCtx]);
+
+  const recipe = recipeFromCtx ?? remote;
 
   if (!recipe) {
     return (
-      <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
-        <Text>No recipe data available.</Text>
+      <View style={{ flex: 1, justifyContent: "center", alignItems: "center", padding: 16 }}>
+        <Text>{loading ? "Loading recipe..." : "No recipe data available."}</Text>
       </View>
     );
   }
@@ -45,8 +114,22 @@ const RecipeDetailScreen: React.FC<Props> = ({ route }) => {
     setReviewText("");
   };
 
-  const ingredientsArray = recipe.ingredients.split("\n");
-  const instructionsArray = recipe.instructions.split("\n");
+  const ingredientsArray = useMemo(
+    () => (recipe.ingredients ? recipe.ingredients.split("\n") : []),
+    [recipe.ingredients]
+  );
+  const instructionsArray = useMemo(
+    () => (recipe.instructions ? recipe.instructions.split("\n") : []),
+    [recipe.instructions]
+  );
+
+  // pick image source
+  const imageSource =
+    recipe.imageLink && recipe.imageLink.length > 0
+      ? { uri: recipe.imageLink }
+      : recipe.imageBinary
+      ? { uri: `data:image/jpeg;base64,${recipe.imageBinary}` }
+      : null;
 
   return (
     <FlatList
@@ -59,67 +142,112 @@ const RecipeDetailScreen: React.FC<Props> = ({ route }) => {
       }
       ListHeaderComponent={
         <View>
-          <Image
-            source={{ uri: `data:image/jpeg;base64,${recipe.imageBinary}` }}
-            style={styles.image}
-          />
+          {imageSource ? (
+            <Image source={imageSource} style={styles.image} />
+          ) : (
+            <View style={[styles.image, { backgroundColor: "#eee" }]} />
+          )}
 
           <Text style={styles.title}>{recipe.title}</Text>
 
           <View style={styles.nutritionRow}>
-            <Text style={styles.nutritionItem}>{recipe.calories} kcal</Text>
-            <Text style={styles.nutritionItem}>{recipe.protein}g Protein</Text>
-            <Text style={styles.nutritionItem}>
-              {recipe.carbohydrates}g Carbs
-            </Text>
-            <Text style={styles.nutritionItem}>{recipe.fat}g Fat</Text>
-            <Text style={styles.nutritionItem}>
-              {recipe.saturatedFat}g Sat Fat
-            </Text>
-            <Text style={styles.nutritionItem}>{recipe.sodium}mg Sodium</Text>
-            <Text style={styles.nutritionItem}>
-              {recipe.cholesterol}mg Cholesterol
-            </Text>
-            <Text style={styles.nutritionItem}>
-              {recipe.potassium}mg Potassium
-            </Text>
+            {typeof recipe.calories === "number" && (
+              <Text style={styles.nutritionItem}>{recipe.calories} kcal</Text>
+            )}
+            {typeof recipe.protein === "number" && (
+              <Text style={styles.nutritionItem}>{recipe.protein}g Protein</Text>
+            )}
+            {typeof recipe.carbohydrates === "number" && (
+              <Text style={styles.nutritionItem}>
+                {recipe.carbohydrates}g Carbs
+              </Text>
+            )}
+            {typeof recipe.fat === "number" && (
+              <Text style={styles.nutritionItem}>{recipe.fat}g Fat</Text>
+            )}
+            {typeof recipe.saturatedFat === "number" && (
+              <Text style={styles.nutritionItem}>
+                {recipe.saturatedFat}g Sat Fat
+              </Text>
+            )}
+            {typeof recipe.sodium === "number" && (
+              <Text style={styles.nutritionItem}>{recipe.sodium}mg Sodium</Text>
+            )}
+            {typeof recipe.cholesterol === "number" && (
+              <Text style={styles.nutritionItem}>
+                {recipe.cholesterol}mg Cholesterol
+              </Text>
+            )}
+            {typeof recipe.potassium === "number" && (
+              <Text style={styles.nutritionItem}>
+                {recipe.potassium}mg Potassium
+              </Text>
+            )}
           </View>
 
           <View style={styles.infoRow}>
-            <Text style={styles.infoItem}>Serving: {recipe.serving}</Text>
-            <Text style={styles.infoItem}>
-              Prep Time: {recipe.prepTime} mins
-            </Text>
-            <Text style={styles.infoItem}>
-              Cook Time: {recipe.cookTime} mins
-            </Text>
-            <Text style={styles.infoItem}>
-              Resting Time: {recipe.restingTime} mins
-            </Text>
-            <Text style={styles.infoItem}>Cuisine: {recipe.cuisine}</Text>
-            <Text style={styles.infoItem}>Meal Type: {recipe.mealType}</Text>
-            <Text style={styles.infoItem}>Author: {recipe.author}</Text>
-            <Text style={styles.infoItem}>
-              Overall Rating: {recipe.overallRating}
-            </Text>
+            {typeof recipe.serving === "number" && (
+              <Text style={styles.infoItem}>Serving: {recipe.serving}</Text>
+            )}
+            {typeof recipe.prepTime === "number" && (
+              <Text style={styles.infoItem}>
+                Prep Time: {recipe.prepTime} mins
+              </Text>
+            )}
+            {typeof recipe.cookTime === "number" && (
+              <Text style={styles.infoItem}>
+                Cook Time: {recipe.cookTime} mins
+              </Text>
+            )}
+            {typeof recipe.restingTime === "number" && (
+              <Text style={styles.infoItem}>
+                Resting Time: {recipe.restingTime} mins
+              </Text>
+            )}
+            {!!recipe.cuisine && (
+              <Text style={styles.infoItem}>Cuisine: {recipe.cuisine}</Text>
+            )}
+            {!!recipe.mealType && (
+              <Text style={styles.infoItem}>Meal Type: {recipe.mealType}</Text>
+            )}
+            {!!recipe.author && (
+              <Text style={styles.infoItem}>Author: {recipe.author}</Text>
+            )}
+            {typeof recipe.overallRating === "number" && (
+              <Text style={styles.infoItem}>
+                Overall Rating: {recipe.overallRating}
+              </Text>
+            )}
           </View>
 
-          <Text style={styles.sectionTitle}>Description</Text>
-          <Text style={styles.listItem}>{recipe.description}</Text>
+          {!!recipe.description && (
+            <>
+              <Text style={styles.sectionTitle}>Description</Text>
+              <Text style={styles.listItem}>{recipe.description}</Text>
+            </>
+          )}
 
-          <Text style={styles.sectionTitle}>Ingredients</Text>
-          {ingredientsArray.map((ing, idx) => (
-            <Text key={idx} style={styles.listItem}>
-              • {ing}
-            </Text>
-          ))}
+          {ingredientsArray.length > 0 && (
+            <>
+              <Text style={styles.sectionTitle}>Ingredients</Text>
+              {ingredientsArray.map((ing, idx) => (
+                <Text key={idx} style={styles.listItem}>
+                  • {ing}
+                </Text>
+              ))}
+            </>
+          )}
 
-          <Text style={styles.sectionTitle}>Instructions</Text>
-          {instructionsArray.map((step, idx) => (
-            <Text key={idx} style={styles.listItem}>
-              {idx + 1}. {step}
-            </Text>
-          ))}
+          {instructionsArray.length > 0 && (
+            <>
+              <Text style={styles.sectionTitle}>Instructions</Text>
+              {instructionsArray.map((step, idx) => (
+                <Text key={idx} style={styles.listItem}>
+                  {idx + 1}. {step}
+                </Text>
+              ))}
+            </>
+          )}
 
           <Text style={styles.sectionTitle}>Reviews</Text>
         </View>

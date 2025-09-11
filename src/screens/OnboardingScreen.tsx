@@ -162,22 +162,29 @@ export default function OnboardingScreen({ onOnboardingComplete }: Props) {
       {step === 3 && (
         <>
           <Text style={styles.title}>How often do you exercise?</Text>
-          {["Never", "1–2x/week", "3–5x/week", "Daily"].map((opt) => (
+          {[
+            { key: "sedentary", label: "Sedentary (little or no exercise)" },
+            { key: "light",     label: "Lightly active (1–3 days/week)" },
+            { key: "moderate",  label: "Moderately active (3–5 days/week)" },
+            { key: "very",      label: "Very active (6–7 days/week)" },
+            { key: "extra",     label: "Extra active (very hard exercise/physical job)" },
+          ].map((opt) => (
             <TouchableOpacity
-              key={opt}
-              style={[styles.option, exercise === opt && styles.optionSelected]}
-              onPress={() => setExercise(opt)}
-            >
-              <Text>{opt}</Text>
-            </TouchableOpacity>
-          ))}
-          {exercise && (
-            <TouchableOpacity style={styles.nextBtn} onPress={() => setStep(4)}>
-              <Text style={styles.nextText}>Next</Text>
-            </TouchableOpacity>
-          )}
-        </>
-      )}
+                    key={opt.key}
+                    style={[styles.option, exercise === opt.key && styles.optionSelected]}
+                    onPress={() => setExercise(opt.key)}
+                  >
+                    <Text>{opt.label}</Text>
+                  </TouchableOpacity>
+                ))}
+
+                {exercise && (
+                  <TouchableOpacity style={styles.nextBtn} onPress={() => setStep(4)}>
+                    <Text style={styles.nextText}>Next</Text>
+                  </TouchableOpacity>
+                )}
+              </>
+            )}
 
       {/* STEP 4 - Weight */}
       {step === 4 && (
@@ -221,15 +228,21 @@ export default function OnboardingScreen({ onOnboardingComplete }: Props) {
       {step === 6 && (
         <>
           <Text style={styles.title}>What is your main goal?</Text>
-          {["Lose Weight", "Maintain Weight", "Gain Muscle", "Improve Overall Health"].map((g) => (
+          {[
+            { key: "LOSE",         label: "Lose weight" },
+            { key: "MAINTAIN",     label: "Maintain weight" },
+            { key: "MUSCLE",       label: "Build muscle" },
+            { key: "IMPROVE",      label: "Improve Overall Health" },
+          ].map((g) => (
             <TouchableOpacity
-              key={g}
-              style={[styles.option, goal === g && styles.optionSelected]}
-              onPress={() => setGoal(g)}
+              key={g.key}
+              style={[styles.option, goal === g.key && styles.optionSelected]}
+              onPress={() => setGoal(g.key)}
             >
-              <Text>{g}</Text>
+              <Text>{g.label}</Text>
             </TouchableOpacity>
           ))}
+
           {goal && (
             <TouchableOpacity style={styles.nextBtn} onPress={() => setStep(7)}>
               <Text style={styles.nextText}>Next</Text>
@@ -237,6 +250,7 @@ export default function OnboardingScreen({ onOnboardingComplete }: Props) {
           )}
         </>
       )}
+
 
       {/* STEP 7 - Timeframe */}
       {step === 7 && (

@@ -12,7 +12,7 @@ type Props = {
   userId: string;
   baseUrl: string;
   initial?: {
-    id: string;
+    id?: string;
     name: string;
     kcal: number;
     time: Date;
@@ -23,7 +23,7 @@ type Props = {
 export default function AddEditMealModal({
   visible, onClose, onSaved, userId, baseUrl, initial
 }: Props) {
-  const isEdit = !!initial;
+  const isEdit = !!initial?.id;
 
   const [name, setName] = useState("");
   const [kcal, setKcal] = useState<string>("");
@@ -99,7 +99,7 @@ export default function AddEditMealModal({
     setShowPicker(true);
   };
 
-  const save = async () => {
+  const saveMeal = async () => {
     if (!name.trim()) {
       Alert.alert("Missing name", "Please enter a food name.");
       return;
@@ -109,7 +109,7 @@ export default function AddEditMealModal({
       foodsConsumed: name.trim(),
       calories: Number(kcal) || 0,
       remarks: remarks.trim() || null,
-      timeConsumed: formatLocalForServerT(dt),
+      timeConsumed: formatLocalForServerT(dt), // Ensure dt is properly formatted as a string
     };
 
     try {
@@ -128,15 +128,16 @@ export default function AddEditMealModal({
       const text = await res.text();
       if (!res.ok) throw new Error(text || `HTTP ${res.status}`);
 
-      onSaved();
-      onClose();
+      onSaved(); // Callback to notify parent component abou
+      onClose(); // Close the modal after saving
     } catch (e: any) {
       console.log("Save Meal error:", e?.message ?? e);
       Alert.alert("Save failed", String(e?.message ?? e));
     } finally {
-      setSaving(false);
+      setSaving(false); // Reset saving state
     }
   };
+
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
@@ -207,7 +208,7 @@ export default function AddEditMealModal({
             <Pressable style={[styles.btn, styles.cancel]} onPress={onClose} disabled={saving}>
               <Text style={styles.btnTxt}>Cancel</Text>
             </Pressable>
-            <Pressable style={[styles.btn, styles.save]} onPress={save} disabled={saving}>
+            <Pressable style={[styles.btn, styles.save]} onPress={saveMeal} disabled={saving}>
               <Text style={[styles.btnTxt, { color: colors.primaryGreen }]}>{isEdit ? "Save" : "Add"}</Text>
             </Pressable>
           </View>
