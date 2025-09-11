@@ -46,7 +46,7 @@ const BAR_W = 14;
 const GAP = 8;
 const SHOW_SHARE_PERCENT = false;
 
-const WEEKDAYS = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+const WEEKDAYS = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
 const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 
 function fmtDayTitle(d: Date) {
@@ -480,7 +480,13 @@ export default function Report() {
                 />
                 <View style={[styles.chartRow, { height: CHART_H, justifyContent: "space-between" }]}>
                   {weekSeries.map((d, i) => {
-                    const h = Math.max(2, Math.round((d.total / weekMax) * CHART_H));
+                    const h = Math.min(
+                                CHART_H,
+                                Math.max(2, Math.round((d.total / (weekMax * 1.25)) * CHART_H))
+                              )
+
+
+
                     const selected = selIdx === i;
                     return (
                       <View key={i} style={{ width: BAR_W, alignItems: "center" }}>
@@ -501,8 +507,11 @@ export default function Report() {
                             ]}
                           />
                         </Pressable>
-                        <Text style={styles.barLabel}>{WEEKDAYS[d.date.getDay()]}</Text>
-                      </View>
+                        <Text style={[styles.barLabel, { width: 24 }]}>
+                          {WEEKDAYS[d.date.getDay() === 0 ? 6 : d.date.getDay() - 1]}
+                        </Text>
+                        </View>
+
                     );
                   })}
                 </View>
@@ -586,7 +595,10 @@ export default function Report() {
                   />
                   <View style={[styles.chartRow, { height: CHART_H }]}>
                     {monthSeries.map((d, i) => {
-                      const h = Math.max(2, Math.round((d.total / monthMax) * CHART_H));
+                      const h = Math.min(
+                                  CHART_H,
+                                  Math.max(2, Math.round((d.total / (monthMax * 1.23)) * CHART_H))
+                                );
                       const selected = selIdx === i;
                       return (
                         <View key={d.key} style={{ width: BAR_W + GAP, alignItems: "center" }}>
