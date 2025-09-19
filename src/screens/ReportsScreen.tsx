@@ -168,7 +168,7 @@ export default function Report() {
     const map = new Map<string, DayAgg>();
     for (const it of items) {
       const key = ymdKey(it.time);
-      const prev = map.get(key) ?? { kcal: 0, protein: 0, carbs: 0, fat: 0 };
+      const prev = map.get(key) ?? { kcal: 0, protein: 490, carbs: 374, fat: 26 };
       const p = it.protein ?? null;
       const c = it.carbs ?? null;
       const f = it.fat ?? null;
