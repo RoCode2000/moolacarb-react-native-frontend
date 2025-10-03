@@ -18,6 +18,7 @@ import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import type { RootStackParamList } from "../App";
 import { useRecipes } from "../context/RecipeContext";
 import { useMemo } from "react";
+import { BASE_URL } from "../config/api";
 
 interface Recipe {
   recipeId: string;
@@ -67,7 +68,7 @@ const RecipeScreen: React.FC = () => {
   // Fetch all recipes
   const fetchRecipes = async () => {
     try {
-      const response = await fetch("http://10.0.2.2:8080/api/recipe/active");
+      const response = await fetch(`${BASE_URL}/api/recipe/active`);
       const data: Recipe[] = await response.json();
       setRecipes(data);
     } catch (error) {
@@ -79,7 +80,7 @@ const RecipeScreen: React.FC = () => {
   const fetchFavourites = async () => {
     if (!isPremium || !user?.userId) return;
     try {
-      const response = await fetch("http://10.0.2.2:8080/api/fav/active", {
+      const response = await fetch(`${BASE_URL}/api/fav/active`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ userId: user.userId }),
@@ -113,7 +114,7 @@ const RecipeScreen: React.FC = () => {
   const toggleFavourite = async (id: string) => {
     if (!isPremium || !user?.userId) return;
     try {
-      const response = await fetch("http://10.0.2.2:8080/api/fav/toggle", {
+      const response = await fetch(`${BASE_URL}/api/fav/toggle`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ userId: user.userId, recipeId: id }),
@@ -175,7 +176,7 @@ const RecipeScreen: React.FC = () => {
   const fetchFavouriteRecipes = async () => {
     if (!isPremium || !user?.userId) return;
     try {
-      const response = await fetch("http://10.0.2.2:8080/api/fav/active", {
+      const response = await fetch(`${BASE_URL}/api/fav/active`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ userId: user.userId }),
@@ -192,7 +193,7 @@ const RecipeScreen: React.FC = () => {
   const fetchMyRecipes = async () => {
     if (!user?.userId) return;
     try {
-      const response = await fetch(`http://10.0.2.2:8080/api/recipe/${user.userId}`);
+      const response = await fetch(`${BASE_URL}/api/recipe/${user.userId}`);
       if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
       const data: Recipe[] = await response.json();
 

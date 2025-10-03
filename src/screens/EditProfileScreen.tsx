@@ -15,21 +15,21 @@ import DateTimePicker from "@react-native-community/datetimepicker";
 import { useFocusEffect } from "@react-navigation/native";
 import { auth } from "../config/firebaseConfig";
 import { useUser } from "../context/UserContext";
+import { BASE_URL } from '../config/api';
 
 /** ===== API endpoints ===== */
-const API_HOST = "http://10.0.2.2:8080";
-const PROFILE_UPSERT = `${API_HOST}/api/user/onboarding`;
-const ME_ENDPOINT = (uid: string) => `${API_HOST}/api/user/me/${uid}`;
+const PROFILE_UPSERT = `${BASE_URL}/api/user/onboarding`;
+const ME_ENDPOINT = (uid: string) => `${BASE_URL}/api/user/me/${uid}`;
 
-const WEIGHT_CURRENT = (uid: string) => `${API_HOST}/api/weight/current/${uid}`;
-const WEIGHT_HISTORY = (uid: string) => `${API_HOST}/api/weight/history/${uid}`;
+const WEIGHT_CURRENT = (uid: string) => `${BASE_URL}/api/weight/current/${uid}`;
+const WEIGHT_HISTORY = (uid: string) => `${BASE_URL}/api/weight/history/${uid}`;
 const WEIGHT_ADD = (uid: string, w: number) =>
-  `${API_HOST}/api/weight/add?firebaseId=${encodeURIComponent(uid)}&weight=${encodeURIComponent(w)}`;
+  `${BASE_URL}/api/weight/add?firebaseId=${encodeURIComponent(uid)}&weight=${encodeURIComponent(w)}`;
 
-const HEIGHT_CURRENT = (uid: string) => `${API_HOST}/api/height/current/${uid}`;
-const HEIGHT_HISTORY = (uid: string) => `${API_HOST}/api/height/history/${uid}`;
+const HEIGHT_CURRENT = (uid: string) => `${BASE_URL}/api/height/current/${uid}`;
+const HEIGHT_HISTORY = (uid: string) => `${BASE_URL}/api/height/history/${uid}`;
 const HEIGHT_ADD = (uid: string, h: number) =>
-  `${API_HOST}/api/height/add?firebaseId=${encodeURIComponent(uid)}&height=${encodeURIComponent(h)}`;
+  `${BASE_URL}/api/height/add?firebaseId=${encodeURIComponent(uid)}&height=${encodeURIComponent(h)}`;
 
 /** Common GET options to fix 406 */
 const GET_JSON: RequestInit = {

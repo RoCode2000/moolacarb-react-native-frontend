@@ -15,6 +15,7 @@ import { LoginManager, AccessToken } from 'react-native-fbsdk-next';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../../App';
+import { BASE_URL } from "../config/api";
 
 // ✅ accept the callback from App.tsx
 type Props = {
@@ -50,7 +51,7 @@ export default function SignUpScreen({ onSignupSuccess }: Props) {
         firebaseId: userCredential.user.uid,
       };
 
-      const response = await fetch('http://10.0.2.2:8080/api/user/login', {
+      const response = await fetch(`${BASE_URL}/api/user/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -109,7 +110,7 @@ export default function SignUpScreen({ onSignupSuccess }: Props) {
         firebaseId: currentUser.uid,
       };
 
-      const response = await fetch('http://10.0.2.2:8080/api/user/google-login', {
+      const response = await fetch(`${BASE_URL}/api/user/google-login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
