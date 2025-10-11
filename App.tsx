@@ -18,6 +18,7 @@ import ProfileScreen from './src/screens/ProfileScreen';
 import SubscriptionTierScreen from './src/screens/SubscriptionTierScreen';
 import OnboardingScreen from "./src/screens/OnboardingScreen";
 import EditProfileScreen from "./src/screens/EditProfileScreen";
+import ChatBotOverlay from './src/components/ChatBotOverlay';
 
 
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
@@ -157,8 +158,14 @@ export default function App() {
 
 
                   <Stack.Screen name="Main">
-                    {() => <AppTabs onLogout={() => setIsLoggedIn(false)} />}
+                    {() => (
+                      <>
+                        <AppTabs onLogout={() => setIsLoggedIn(false)} />
+                        <ChatBotOverlay />
+                      </>
+                    )}
                   </Stack.Screen>
+
 
                   <Stack.Screen
                     name="RecipeDetailScreen"
