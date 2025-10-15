@@ -1,7 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <network-security-config>
+    <!-- Allow HTTP traffic everywhere (for dev builds) -->
+    <base-config cleartextTrafficPermitted="true" />
+
+    <!-- Optional: keep your backend IP for clarity -->
     <domain-config cleartextTrafficPermitted="true">
-        <!-- Allow your backend IP -->
         <domain includeSubdomains="true">213.35.111.133</domain>
     </domain-config>
 </network-security-config>
