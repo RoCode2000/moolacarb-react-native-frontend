@@ -36,42 +36,48 @@ function endOfDay(d: Date) {
   return new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1, 0, 0, 0, 0);
 }
 
-// Reusable function to fetch recipe data
+// Reusable function to fetch recipe data (DB-first, fallback path)
 const fetchRecipeData = async (recipeId: string) => {
   const tryFetch = async (path: string) => {
     const res = await fetch(`${BASE_URL}${path}`);
     if (!res.ok) throw new Error(String(res.status));
     return res.json();
   };
-
   try {
-    let data: any | null = await tryFetch(`/api/recipes/${encodeURIComponent(recipeId)}`);
-    return data;
-  } catch (e) {
-    let data: any | null = await tryFetch(`/api/recipe/${encodeURIComponent(recipeId)}`);
-    return data;
+    return await tryFetch(`/api/recipes/${encodeURIComponent(recipeId)}`);
+  } catch {
+    return await tryFetch(`/api/recipe/${encodeURIComponent(recipeId)}`);
   }
 };
 
-// A small helper to normalize a local Date
+// Normalize a local Date (no ms)
 const normalizeLocal = (d: Date) =>
-  new Date(
-    d.getFullYear(),
-    d.getMonth(),
-    d.getDate(),
-    d.getHours(),
-    d.getMinutes(),
-    d.getSeconds(),
-    0
-  );
+  new Date(d.getFullYear(), d.getMonth(), d.getDate(), d.getHours(), d.getMinutes(), d.getSeconds(), 0);
 
 /** Shape used by AddEditMealModal.initial (id is optional) */
 type ModalInitial = {
   id?: string;
   name: string;
-  kcal: number;
+  kcal: number | null;
   time: Date;
   remarks?: string;
+  carbs?: number | null;
+  protein?: number | null;
+  fat?: number | null;
+};
+
+// number (int) or null; never force 0 for missing values
+const toNullableInt = (v: any): number | null => {
+  if (v === null || v === undefined || v === "") return null;
+  const n = Math.round(Number(v));
+  return Number.isNaN(n) ? null : Math.max(0, n); // clamp negatives to 0 if you prefer that behavior
+};
+
+const toNullableFloat = (v: any): number | null => {
+  if (v === null || v === undefined || v === "") return null;
+  const n = parseFloat(String(v));
+  if (Number.isNaN(n)) return null;
+  return n < 0 ? 0 : n; // keep decimal part intact
 };
 
 export default function HomeScreen() {
@@ -83,10 +89,13 @@ export default function HomeScreen() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [dailyTarget, setDailyTarget] = useState<number>(0);
-  const [recs, setRecs] = useState<{ id: string; name: string; kcal: number; img?: string | null }[]>([]);
+
+  // carry macros in recs so the card can pass them through
+  const [recs, setRecs] = useState<
+    { id: string; name: string; kcal: number | null; carbs?: number | null; protein?: number | null; fat?: number | null; img?: string | null }[]
+  >([]);
 
   const [showModal, setShowModal] = useState(false);
-  // Store a draft for the modal, not necessarily an existing item (id optional)
   const [draft, setDraft] = useState<ModalInitial | null>(null);
 
   // ---- Load meal logs ------------------------------------------------------
@@ -102,21 +111,28 @@ export default function HomeScreen() {
       type ApiMeal = {
         mealLogId: number;
         foodsConsumed: string;
-        calories: number;
+        calories: number | null;
         remarks?: string;
         timeConsumed: string;
+        carbs?: number | null;
+        protein?: number | null;
+        fat?: number | null;
       };
 
       const data: ApiMeal[] = await res.json();
 
       const mapped: MealItem[] = data.map((m) => {
-        const t = parseLocalDateTime(m.timeConsumed) ?? new Date(); // fallback to now if parsing fails
+        const t = parseLocalDateTime(m.timeConsumed) ?? new Date();
         return {
           id: String(m.mealLogId),
           name: m.foodsConsumed ?? "(Unnamed)",
-          kcal: Number(m.calories ?? 0),
+          // keep numbers for totals; if you want to preserve nulls, change MealItem.kcal to number|null
+          kcal: m.calories == null ? 0 : Number(m.calories),
           remarks: m.remarks ?? undefined,
           time: t,
+          carbs: m.carbs ?? null,
+          protein: m.protein ?? null,
+          fat: m.fat ?? null,
         };
       });
 
@@ -185,7 +201,10 @@ export default function HomeScreen() {
           (Array.isArray(data) ? data : []).map((r: any) => ({
             id: String(r.id),
             name: r.title,
-            kcal: Number(r.kcal ?? r.calories ?? 0),
+            kcal: r.kcal ?? r.calories ?? null,
+            carbs: r.carbohydrates ?? r.carbs ?? null,
+            protein: r.protein ?? null,
+            fat: r.fat ?? null,
             img: r.imageLink ?? null,
           }))
         );
@@ -196,12 +215,10 @@ export default function HomeScreen() {
     })();
   }, [userId]);
 
-  // ---- UI handlers ---------------------------------------------------------
   const handleAdd = () => {
-    // fresh draft with "now" as default time
     setDraft({
       name: "",
-      kcal: 0,
+      kcal: null, // blank by default (not 0)
       time: normalizeLocal(new Date()),
       remarks: "",
     });
@@ -217,6 +234,9 @@ export default function HomeScreen() {
       kcal: found.kcal,
       time: normalizeLocal(found.time),
       remarks: found.remarks,
+      carbs: found.carbs ?? null,
+      protein: found.protein ?? null,
+      fat: found.fat ?? null,
     });
     setShowModal(true);
   };
@@ -243,16 +263,17 @@ export default function HomeScreen() {
   const handleRecipeCardPress = (recipe: {
     id: string;
     name: string;
-    kcal: number;
+    kcal: number | null;
+    carbs?: number | null;
+    protein?: number | null;
+    fat?: number | null;
     img?: string | null;
   }) => {
     Alert.alert("What would you like to do?", recipe.name, [
       {
         text: "View Recipe",
         onPress: () => {
-          navigation.navigate("RecipeDetailScreen", {
-            recipeId: recipe.id,
-          });
+          navigation.navigate("RecipeDetailScreen", { recipeId: recipe.id });
         },
       },
       {
@@ -264,10 +285,15 @@ export default function HomeScreen() {
             const draftFromRecipe: ModalInitial = {
               // no id here -> modal will POST (add), not PUT (edit)
               name: data?.title ?? recipe.name,
-              kcal: Number(data?.calories ?? recipe.kcal ?? 0),
-              time: normalizeLocal(new Date()), // "today" by default; user can change in modal
+              kcal:    toNullableInt(data?.calories ?? recipe.kcal),
+              carbs:   toNullableFloat(data?.carbohydrates ?? recipe.carbs),
+              protein: toNullableFloat(data?.protein ?? recipe.protein),
+              fat:     toNullableFloat(data?.fat ?? recipe.fat),
+              time: normalizeLocal(new Date()),
               remarks: data?.remarks ?? "",
             };
+
+            console.log("Draft from recipe:", draftFromRecipe);
 
             setDraft(draftFromRecipe);
             setShowModal(true);
@@ -308,7 +334,7 @@ export default function HomeScreen() {
           onSaved={fetchMealLogs}
           userId={userId}
           baseUrl={BASE_URL}
-          initial={draft} // <-- optional id; modal decides POST vs PUT
+          initial={draft} // optional id; modal decides POST vs PUT
         />
       )}
     </ScrollView>

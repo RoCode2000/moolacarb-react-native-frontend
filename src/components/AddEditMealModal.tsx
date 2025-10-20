@@ -14,9 +14,12 @@ type Props = {
   initial?: {
     id?: string;
     name: string;
-    kcal: number;
+    kcal: number | null;
     time: Date;
     remarks?: string;
+    carbs?: number | null;
+    protein?: number | null;
+    fat?: number | null;
   } | null;
 };
 
@@ -27,21 +30,20 @@ export default function AddEditMealModal({
 
   const [name, setName] = useState("");
   const [kcal, setKcal] = useState<string>("");
+  const [carbs, setCarbs] = useState<string>("");
+  const [protein, setProtein] = useState<string>("");
+  const [fat, setFat] = useState<string>("");
   const [remarks, setRemarks] = useState("");
   const [dt, setDt] = useState<Date>(new Date());
   const [saving, setSaving] = useState(false);
 
-  // iOS (single step) / Android (date -> time two steps)
   const [showPicker, setShowPicker] = useState(false);
   const [showTimeStep, setShowTimeStep] = useState(false);
 
-
-  // Normalize to a clean "local" Date (no ms)
   const normalizeLocal = (d: Date) =>
     new Date(d.getFullYear(), d.getMonth(), d.getDate(), d.getHours(), d.getMinutes(), d.getSeconds(), 0);
 
-  // Spring expects LocalDateTime in ISO with 'T', no timezone/offset:
-  // e.g. "2025-09-06T13:05:00"  (NO trailing 'Z')
+  // Spring expects LocalDateTime in ISO with 'T' (no timezone)
   const formatLocalForServerT = (d: Date) => {
     const pad = (n: number) => String(n).padStart(2, "0");
     return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
@@ -55,7 +57,6 @@ export default function AddEditMealModal({
       hour: "2-digit",
       minute: "2-digit",
       hour12: true,
-      // NOTE: no explicit timeZone override here
     });
 
   useEffect(() => {
@@ -63,6 +64,9 @@ export default function AddEditMealModal({
 
     setName(initial?.name ?? "");
     setKcal(initial?.kcal != null ? String(initial.kcal) : "");
+    setCarbs(initial?.carbs != null ? String(initial.carbs) : "");
+    setProtein(initial?.protein != null ? String(initial.protein) : "");
+    setFat(initial?.fat != null ? String(initial.fat) : "");
     setRemarks(initial?.remarks ?? "");
 
     const seed = initial?.time ?? new Date();
@@ -72,7 +76,6 @@ export default function AddEditMealModal({
     setShowTimeStep(false);
   }, [visible, initial]);
 
-  /** ===================== Pickers ===================== **/
   const onChangeIOS = (_e: DateTimePickerEvent, val?: Date) => {
     if (val) setDt(normalizeLocal(val));
   };
@@ -99,6 +102,22 @@ export default function AddEditMealModal({
     setShowPicker(true);
   };
 
+  // number (int) or null; never force 0 for missing values
+  const toNullableInt = (s: string): number | null => {
+    const t = s.trim();
+    if (!t) return null;
+    const n = Math.round(Number(t));
+    if (Number.isNaN(n)) return null;
+    return n < 0 ? 0 : n;
+  };
+
+  const toNullableFloat = (v: any): number | null => {
+    if (v === null || v === undefined || v === "") return null;
+    const n = parseFloat(String(v));
+    if (Number.isNaN(n)) return null;
+    return n < 0 ? 0 : n;
+  };
+
   const saveMeal = async () => {
     if (!name.trim()) {
       Alert.alert("Missing name", "Please enter a food name.");
@@ -107,17 +126,22 @@ export default function AddEditMealModal({
 
     const body = {
       foodsConsumed: name.trim(),
-      calories: Number(kcal) || 0,
+      calories: toNullableInt(kcal),
+      carbs: toNullableFloat(carbs),
+      protein: toNullableFloat(protein),
+      fat: toNullableFloat(fat),
       remarks: remarks.trim() || null,
-      timeConsumed: formatLocalForServerT(dt), // Ensure dt is properly formatted as a string
+      timeConsumed: formatLocalForServerT(dt),
     };
 
     try {
       setSaving(true);
 
       const url = isEdit && initial
-        ? `${baseUrl}/api/meallogs/${encodeURIComponent(initial.id)}`
+        ? `${baseUrl}/api/meallogs/${encodeURIComponent(initial.id!)}`
         : `${baseUrl}/api/meallogs/by-firebase/${encodeURIComponent(userId)}`;
+
+      console.log("POST body", body);
 
       const res = await fetch(url, {
         method: isEdit ? "PUT" : "POST",
@@ -128,16 +152,15 @@ export default function AddEditMealModal({
       const text = await res.text();
       if (!res.ok) throw new Error(text || `HTTP ${res.status}`);
 
-      onSaved(); // Callback to notify parent component abou
-      onClose(); // Close the modal after saving
+      onSaved();
+      onClose();
     } catch (e: any) {
       console.log("Save Meal error:", e?.message ?? e);
       Alert.alert("Save failed", String(e?.message ?? e));
     } finally {
-      setSaving(false); // Reset saving state
+      setSaving(false);
     }
   };
-
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
@@ -153,12 +176,39 @@ export default function AddEditMealModal({
             style={styles.input}
           />
 
-          <Text style={styles.label}>Estimated Calories (kcal)</Text>
+          <Text style={styles.label}>Approx. Calories (kcal)</Text>
           <TextInput
             value={kcal}
             onChangeText={setKcal}
-            placeholder="e.g. 550"
+            placeholder="e.g. 678"
             keyboardType="number-pad"
+            style={styles.input}
+          />
+
+          <Text style={styles.label}>Carbs (g)</Text>
+          <TextInput
+            value={carbs}
+            onChangeText={setCarbs}
+            placeholder="e.g. 12.3"
+            keyboardType="decimal-pad"
+            style={styles.input}
+          />
+
+          <Text style={styles.label}>Protein (g)</Text>
+          <TextInput
+            value={protein}
+            onChangeText={setProtein}
+            placeholder="e.g. 2.3"
+            keyboardType="decimal-pad"
+            style={styles.input}
+          />
+
+          <Text style={styles.label}>Fat (g)</Text>
+          <TextInput
+            value={fat}
+            onChangeText={setFat}
+            placeholder="e.g. 3.4"
+            keyboardType="decimal-pad"
             style={styles.input}
           />
 
