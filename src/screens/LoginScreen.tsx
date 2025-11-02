@@ -21,6 +21,7 @@ import {
 import { auth } from '../config/firebaseConfig';
 import '../config/googleConfig';
 import { GoogleSignin } from '@react-native-google-signin/google-signin';
+import { colors } from '../theme/colors';
 
 import { BASE_URL } from '../config/api';
 
@@ -266,7 +267,7 @@ const LoginScreen = ({ onLoginSuccess }: Props) => {
         <Icon name="envelope" size={18} style={styles.inputIcon} />
         <TextInput
           placeholder="Email"
-          style={[styles.input, { color: '#000' }]} // <-- force black text
+          style={[styles.input, { color: '#888' }]}
           value={email}
           onChangeText={setEmail}
           keyboardType="email-address"
@@ -279,7 +280,8 @@ const LoginScreen = ({ onLoginSuccess }: Props) => {
         <Icon name="lock" size={18} style={styles.inputIcon} />
         <TextInput
           placeholder="Password"
-          style={styles.input}
+          style={[styles.input, { color: '#888' }]}
+          placeholderTextColor="#888"
           value={password}
           onChangeText={setPassword}
           secureTextEntry

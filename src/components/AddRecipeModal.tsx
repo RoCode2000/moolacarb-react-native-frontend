@@ -9,6 +9,7 @@ import {
   Image,
   Alert,
   StyleSheet,
+  TouchableOpacity,
 } from "react-native";
 import { launchCamera, launchImageLibrary } from "react-native-image-picker";
 import { Recipe } from "../types/Recipe";
@@ -247,13 +248,72 @@ const AddRecipeModal: React.FC<AddRecipeModalProps> = ({ visible, onClose, onSav
             />
 
             {/* Image */}
-            <Button title="Pick Image" onPress={pickImage} />
-            <Button title="Take Photo" onPress={takePhoto} />
-            {imageUri && <Image source={{ uri: imageUri }} style={{ width: 100, height: 100, marginVertical: 10 }} />}
+{/* Image Buttons */}
+{/* Buttons & preview — one per line */}
+<TouchableOpacity
+  onPress={pickImage}
+  style={{
+    backgroundColor: "#E8EAF6",
+    paddingVertical: 10,
+    borderRadius: 8,
+    alignItems: "center",
+    marginBottom: 10,
+    width: "100%",
+  }}
+>
+  <Text style={{ color: "#3F51B5", fontWeight: "600" }}>Pick Image</Text>
+</TouchableOpacity>
 
-            {/* Buttons */}
-            <Button title="Save Recipe" onPress={handleSaveRecipe} />
-            <Button title="Cancel" color="red" onPress={onClose} />
+<TouchableOpacity
+  onPress={takePhoto}
+  style={{
+    backgroundColor: "#E3F2FD",
+    paddingVertical: 10,
+    borderRadius: 8,
+    alignItems: "center",
+    marginBottom: 10,
+    width: "100%",
+  }}
+>
+  <Text style={{ color: "#1976D2", fontWeight: "600" }}>Take Photo</Text>
+</TouchableOpacity>
+
+{imageUri && (
+  <Image
+    source={{ uri: imageUri }}
+    style={{ width: "100%", height: 160, marginVertical: 10, borderRadius: 8 }}
+    resizeMode="cover"
+  />
+)}
+
+<TouchableOpacity
+  onPress={handleSaveRecipe}
+  style={{
+    backgroundColor: "#4CAF50",
+    paddingVertical: 12,
+    borderRadius: 8,
+    alignItems: "center",
+    marginBottom: 10,
+    width: "100%",
+  }}
+>
+  <Text style={{ color: "white", fontWeight: "600" }}>Save Recipe</Text>
+</TouchableOpacity>
+
+<TouchableOpacity
+  onPress={onClose}
+  style={{
+    backgroundColor: "#FFCDD2",
+    paddingVertical: 12,
+    borderRadius: 8,
+    alignItems: "center",
+    width: "100%",
+  }}
+>
+  <Text style={{ color: "#B71C1C", fontWeight: "600" }}>Cancel</Text>
+</TouchableOpacity>
+
+
           </ScrollView>
         </View>
       </View>
