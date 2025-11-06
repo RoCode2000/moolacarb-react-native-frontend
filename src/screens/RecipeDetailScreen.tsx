@@ -79,9 +79,9 @@ const RecipeDetailScreen: React.FC<Props> = ({ route }) => {
         };
         let data: RecipeDTO | null = null;
         try {
-          data = await tryFetch(`/api/recipes/${encodeURIComponent(recipeId)}`);
+          data = await tryFetch(`${BASE_URL}/api/recipes/${encodeURIComponent(recipeId)}`);
         } catch {
-          data = await tryFetch(`/api/recipe/${encodeURIComponent(recipeId)}`);
+          data = await tryFetch(`${BASE_URL}/api/recipe/${encodeURIComponent(recipeId)}`);
         }
         if (alive) setRemote(data ?? null);
       } catch {

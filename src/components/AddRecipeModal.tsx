@@ -5,16 +5,16 @@ import {
   ScrollView,
   Text,
   TextInput,
-  Button,
   Image,
   Alert,
   StyleSheet,
   TouchableOpacity,
 } from "react-native";
 import { launchCamera, launchImageLibrary } from "react-native-image-picker";
-import { Recipe } from "../types/Recipe";
+import { readFile } from "react-native-fs";
 import { useUser } from "../context/UserContext";
-import { readFile } from "react-native-fs"; // npm install react-native-fs
+import { Recipe } from "../types/Recipe";
+import { BASE_URL } from "../config";
 
 interface AddRecipeModalProps {
   visible: boolean;
@@ -34,8 +34,6 @@ const AddRecipeModal: React.FC<AddRecipeModalProps> = ({ visible, onClose, onSav
         const uri = response.assets[0].uri!;
         setImageUri(uri);
         setNewRecipe({ ...newRecipe, imageLink: uri });
-
-        // Convert image to base64
         const base64 = await readFile(uri, "base64");
         setImageBase64(base64);
       }
@@ -48,7 +46,6 @@ const AddRecipeModal: React.FC<AddRecipeModalProps> = ({ visible, onClose, onSav
         const uri = response.assets[0].uri!;
         setImageUri(uri);
         setNewRecipe({ ...newRecipe, imageLink: uri });
-
         const base64 = await readFile(uri, "base64");
         setImageBase64(base64);
       }
@@ -86,14 +83,16 @@ const AddRecipeModal: React.FC<AddRecipeModalProps> = ({ visible, onClose, onSav
         author: user.userId,
       };
 
-      const response = await fetch("http://10.0.2.2:8080/api/recipe/add", {
+      const url = `${BASE_URL}/api/recipe/add`;
+      console.log("[AddRecipeModal] POST", url);
+
+      const response = await fetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
 
-      if (!response.ok) throw new Error("Failed to save recipe");
-
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
       Alert.alert("Success", "Recipe added!");
       setNewRecipe({});
       setImageUri(null);
@@ -106,15 +105,13 @@ const AddRecipeModal: React.FC<AddRecipeModalProps> = ({ visible, onClose, onSav
     }
   };
 
-
   return (
-    <Modal visible={visible} animationType="slide" transparent={true}>
+    <Modal visible={visible} animationType="slide" transparent>
       <View style={styles.modalOverlay}>
         <View style={styles.modalContent}>
           <ScrollView>
             <Text style={styles.header}>Add New Recipe</Text>
 
-            {/* Title */}
             <TextInput
               placeholder="Title"
               style={styles.input}
@@ -122,7 +119,6 @@ const AddRecipeModal: React.FC<AddRecipeModalProps> = ({ visible, onClose, onSav
               onChangeText={(text) => setNewRecipe({ ...newRecipe, title: text })}
             />
 
-            {/* Serving */}
             <TextInput
               placeholder="Serving"
               style={styles.input}
@@ -133,7 +129,6 @@ const AddRecipeModal: React.FC<AddRecipeModalProps> = ({ visible, onClose, onSav
               }
             />
 
-            {/* Ingredients */}
             <TextInput
               placeholder="Ingredients"
               style={styles.input}
@@ -142,7 +137,6 @@ const AddRecipeModal: React.FC<AddRecipeModalProps> = ({ visible, onClose, onSav
               onChangeText={(text) => setNewRecipe({ ...newRecipe, ingredients: text })}
             />
 
-            {/* Instructions */}
             <TextInput
               placeholder="Instructions"
               style={styles.input}
@@ -151,7 +145,6 @@ const AddRecipeModal: React.FC<AddRecipeModalProps> = ({ visible, onClose, onSav
               onChangeText={(text) => setNewRecipe({ ...newRecipe, instructions: text })}
             />
 
-            {/* Calories */}
             <TextInput
               placeholder="Calories"
               style={styles.input}
@@ -162,7 +155,6 @@ const AddRecipeModal: React.FC<AddRecipeModalProps> = ({ visible, onClose, onSav
               }
             />
 
-            {/* Other numeric fields */}
             <TextInput
               placeholder="Carbohydrates"
               style={styles.input}
@@ -193,7 +185,6 @@ const AddRecipeModal: React.FC<AddRecipeModalProps> = ({ visible, onClose, onSav
               }
             />
 
-            {/* Prep/Cook/Resting Times */}
             <TextInput
               placeholder="Prep Time"
               style={styles.input}
@@ -203,6 +194,7 @@ const AddRecipeModal: React.FC<AddRecipeModalProps> = ({ visible, onClose, onSav
                 setNewRecipe({ ...newRecipe, prepTime: parseInt(text) || 0 })
               }
             />
+
             <TextInput
               placeholder="Cook Time"
               style={styles.input}
@@ -212,6 +204,7 @@ const AddRecipeModal: React.FC<AddRecipeModalProps> = ({ visible, onClose, onSav
                 setNewRecipe({ ...newRecipe, cookTime: parseInt(text) || 0 })
               }
             />
+
             <TextInput
               placeholder="Resting Time"
               style={styles.input}
@@ -222,7 +215,6 @@ const AddRecipeModal: React.FC<AddRecipeModalProps> = ({ visible, onClose, onSav
               }
             />
 
-            {/* Cuisine */}
             <TextInput
               placeholder="Cuisine"
               style={styles.input}
@@ -230,7 +222,6 @@ const AddRecipeModal: React.FC<AddRecipeModalProps> = ({ visible, onClose, onSav
               onChangeText={(text) => setNewRecipe({ ...newRecipe, cuisine: text })}
             />
 
-            {/* Description */}
             <TextInput
               placeholder="Description"
               style={styles.input}
@@ -239,7 +230,6 @@ const AddRecipeModal: React.FC<AddRecipeModalProps> = ({ visible, onClose, onSav
               onChangeText={(text) => setNewRecipe({ ...newRecipe, description: text })}
             />
 
-            {/* Meal Type */}
             <TextInput
               placeholder="Meal Type"
               style={styles.input}
@@ -247,73 +237,35 @@ const AddRecipeModal: React.FC<AddRecipeModalProps> = ({ visible, onClose, onSav
               onChangeText={(text) => setNewRecipe({ ...newRecipe, mealType: text })}
             />
 
-            {/* Image */}
-{/* Image Buttons */}
-{/* Buttons & preview — one per line */}
-<TouchableOpacity
-  onPress={pickImage}
-  style={{
-    backgroundColor: "#E8EAF6",
-    paddingVertical: 10,
-    borderRadius: 8,
-    alignItems: "center",
-    marginBottom: 10,
-    width: "100%",
-  }}
->
-  <Text style={{ color: "#3F51B5", fontWeight: "600" }}>Pick Image</Text>
-</TouchableOpacity>
+            <TouchableOpacity
+              onPress={pickImage}
+              style={styles.pickBtn}
+            >
+              <Text style={styles.pickTxt}>Pick Image</Text>
+            </TouchableOpacity>
 
-<TouchableOpacity
-  onPress={takePhoto}
-  style={{
-    backgroundColor: "#E3F2FD",
-    paddingVertical: 10,
-    borderRadius: 8,
-    alignItems: "center",
-    marginBottom: 10,
-    width: "100%",
-  }}
->
-  <Text style={{ color: "#1976D2", fontWeight: "600" }}>Take Photo</Text>
-</TouchableOpacity>
+            <TouchableOpacity
+              onPress={takePhoto}
+              style={styles.photoBtn}
+            >
+              <Text style={styles.photoTxt}>Take Photo</Text>
+            </TouchableOpacity>
 
-{imageUri && (
-  <Image
-    source={{ uri: imageUri }}
-    style={{ width: "100%", height: 160, marginVertical: 10, borderRadius: 8 }}
-    resizeMode="cover"
-  />
-)}
+            {imageUri && (
+              <Image
+                source={{ uri: imageUri }}
+                style={styles.preview}
+                resizeMode="cover"
+              />
+            )}
 
-<TouchableOpacity
-  onPress={handleSaveRecipe}
-  style={{
-    backgroundColor: "#4CAF50",
-    paddingVertical: 12,
-    borderRadius: 8,
-    alignItems: "center",
-    marginBottom: 10,
-    width: "100%",
-  }}
->
-  <Text style={{ color: "white", fontWeight: "600" }}>Save Recipe</Text>
-</TouchableOpacity>
+            <TouchableOpacity onPress={handleSaveRecipe} style={styles.saveBtn}>
+              <Text style={styles.saveTxt}>Save Recipe</Text>
+            </TouchableOpacity>
 
-<TouchableOpacity
-  onPress={onClose}
-  style={{
-    backgroundColor: "#FFCDD2",
-    paddingVertical: 12,
-    borderRadius: 8,
-    alignItems: "center",
-    width: "100%",
-  }}
->
-  <Text style={{ color: "#B71C1C", fontWeight: "600" }}>Cancel</Text>
-</TouchableOpacity>
-
-
+            <TouchableOpacity onPress={onClose} style={styles.cancelBtn}>
+              <Text style={styles.cancelTxt}>Cancel</Text>
+            </TouchableOpacity>
           </ScrollView>
         </View>
       </View>
@@ -322,7 +274,6 @@ const AddRecipeModal: React.FC<AddRecipeModalProps> = ({ visible, onClose, onSav
 };
 
 export default AddRecipeModal;
-
 
 const styles = StyleSheet.create({
   modalOverlay: {
@@ -346,4 +297,41 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   header: { fontWeight: "bold", fontSize: 18, marginBottom: 10 },
+  pickBtn: {
+    backgroundColor: "#E8EAF6",
+    paddingVertical: 10,
+    borderRadius: 8,
+    alignItems: "center",
+    marginBottom: 10,
+  },
+  pickTxt: { color: "#3F51B5", fontWeight: "600" },
+  photoBtn: {
+    backgroundColor: "#E3F2FD",
+    paddingVertical: 10,
+    borderRadius: 8,
+    alignItems: "center",
+    marginBottom: 10,
+  },
+  photoTxt: { color: "#1976D2", fontWeight: "600" },
+  preview: {
+    width: "100%",
+    height: 160,
+    marginVertical: 10,
+    borderRadius: 8,
+  },
+  saveBtn: {
+    backgroundColor: "#4CAF50",
+    paddingVertical: 12,
+    borderRadius: 8,
+    alignItems: "center",
+    marginBottom: 10,
+  },
+  saveTxt: { color: "white", fontWeight: "600" },
+  cancelBtn: {
+    backgroundColor: "#FFCDD2",
+    paddingVertical: 12,
+    borderRadius: 8,
+    alignItems: "center",
+  },
+  cancelTxt: { color: "#B71C1C", fontWeight: "600" },
 });

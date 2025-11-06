@@ -126,7 +126,7 @@ const LoginScreen = ({ onLoginSuccess }: Props) => {
           photoUrl: userInfo.data.user.photo
         };
 
-        const response = await fetch("${BASE_URL}/api/user/google-login", {
+        const response = await fetch(`${BASE_URL}/api/user/google-login`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),

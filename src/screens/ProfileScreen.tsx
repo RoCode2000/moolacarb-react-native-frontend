@@ -44,11 +44,6 @@ export default function ProfileScreen({ onLogout }: Props) {
         </Text>
       )}
 
-      {/* Profile Options */}
-      <TouchableOpacity style={styles.optionButton} onPress={() => navigation.navigate('SubscriptionTier')}>
-        <Text style={styles.optionText}>Subscription Tier</Text>
-      </TouchableOpacity>
-
         <TouchableOpacity
           style={styles.optionButton}
           onPress={() => navigation.navigate("EditProfile")}

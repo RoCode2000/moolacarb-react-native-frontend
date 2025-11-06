@@ -5,7 +5,7 @@ const DEV_URL_IOS = 'http://127.0.0.1:8080';     // iOS simulator
 const DEV_URL_ANDROID = 'http://10.0.2.2:8080';  // Android emulator
 
 // Production URL (your Oracle VM public IP)
-const PROD_URL = 'http://213.35.111.133';
+const PROD_URL = 'http://4.190.64.83';
 
 // Determine correct DEV URL based on platform
 const DEV_URL =
