@@ -14,14 +14,65 @@ import axios from "axios";
 const FLOWISE_API_URL =
   "http://10.0.2.2:3000/api/v1/prediction/af20da84-f6c4-486a-84f7-5f1a40a9fa42";
 
-export default function ChatBotOverlay() {
-  const [visible, setVisible] = useState(false);
+// Helper to format text with * and ** patterns
+const formatMessage = (text: string) => {
+  // Split text into lines
+  return text.split("\n").map((line, index) => {
+    const trimmed = line.trim();
+    let content: any[] = [];
+
+    // If line starts with a single asterisk, treat it as a bullet point
+    if (trimmed.startsWith("* ")) {
+      const processed = trimmed.replace(/^\* /, "• ");
+      const parts = processed.split(/\*\*(.*?)\*\*/g);
+      parts.forEach((part, i) => {
+        if (i % 2 === 1) {
+          // Bold section
+          content.push(
+            <Text key={i} style={{ fontWeight: "bold" }}>
+              {part}
+            </Text>
+          );
+        } else {
+          content.push(part);
+        }
+      });
+    } else {
+      // Normal line (with possible bold)
+      const parts = trimmed.split(/\*\*(.*?)\*\*/g);
+      parts.forEach((part, i) => {
+        if (i % 2 === 1) {
+          content.push(
+            <Text key={i} style={{ fontWeight: "bold" }}>
+              {part}
+            </Text>
+          );
+        } else {
+          content.push(part);
+        }
+      });
+    }
+
+    return (
+      <Text key={index} style={{ marginBottom: 4 }}>
+        {content}
+      </Text>
+    );
+  });
+};
+
+export default function ChatBotOverlay({
+  visible,
+  onClose,
+}: {
+  visible: boolean;
+  onClose: () => void;
+}) {
   const [messages, setMessages] = useState<{ role: string; content: string }[]>(
     []
   );
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
-
 
   const flatListRef = useRef<FlatList>(null);
 
@@ -54,80 +105,62 @@ export default function ChatBotOverlay() {
   };
 
   return (
-    <>
-      {/* Floating Chat Button */}
-      <TouchableOpacity
-        style={styles.floatingButton}
-        onPress={() => setVisible(true)}
-      >
-        <Icon name="chat-outline" size={28} color="#fff" />
-      </TouchableOpacity>
+    <Modal visible={visible} animationType="slide" transparent>
+      <View style={styles.overlay}>
+        <View style={styles.chatBox}>
+          <View style={styles.header}>
+            <Text style={styles.title}>MoolaBot</Text>
+            <TouchableOpacity onPress={onClose}>
+              <Icon name="close" size={22} color="#fff" />
+            </TouchableOpacity>
+          </View>
 
-      {/* Chat Modal */}
-      <Modal visible={visible} animationType="slide" transparent>
-        <View style={styles.overlay}>
-          <View style={styles.chatBox}>
-            <View style={styles.header}>
-              <Text style={styles.title}>MoolaBot</Text>
-              <TouchableOpacity onPress={() => setVisible(false)}>
-                <Icon name="close" size={22} color="#fff" />
-              </TouchableOpacity>
-            </View>
+          <FlatList
+            ref={flatListRef}
+            data={messages}
+            keyExtractor={(_, i) => i.toString()}
+            renderItem={({ item }) => (
+              <View
+                style={[
+                  styles.message,
+                  item.role === "user" ? styles.userMsg : styles.botMsg,
+                ]}
+              >
+                {item.role === "bot" ? (
+                  <View style={styles.formattedText}>{formatMessage(item.content)}</View>
+                ) : (
+                  <Text style={[styles.msgText, { color: "#fff" }]}>
+                    {item.content}
+                  </Text>
+                )}
+              </View>
+            )}
+            onContentSizeChange={() =>
+              flatListRef.current?.scrollToEnd({ animated: true })
+            }
+            onLayout={() =>
+              flatListRef.current?.scrollToEnd({ animated: true })
+            }
+          />
 
-
-            <FlatList
-              ref={flatListRef}
-              data={messages}
-              keyExtractor={(_, i) => i.toString()}
-              renderItem={({ item }) => (
-                <View
-                  style={[
-                    styles.message,
-                    item.role === "user" ? styles.userMsg : styles.botMsg,
-                  ]}
-                >
-                  <Text style={styles.msgText}>{item.content}</Text>
-                </View>
-              )}
-              onContentSizeChange={() =>
-                flatListRef.current?.scrollToEnd({ animated: true })
-              }
-              onLayout={() =>
-                flatListRef.current?.scrollToEnd({ animated: true })
-              }
+          <View style={styles.inputRow}>
+            <TextInput
+              style={styles.input}
+              placeholder="Type your message..."
+              value={input}
+              onChangeText={setInput}
             />
-
-            <View style={styles.inputRow}>
-              <TextInput
-                style={styles.input}
-                placeholder="Type your message..."
-                value={input}
-                onChangeText={setInput}
-              />
-              <TouchableOpacity onPress={sendMessage} disabled={loading}>
-                <Icon name="send" size={24} color="#007bff" />
-              </TouchableOpacity>
-            </View>
+            <TouchableOpacity onPress={sendMessage} disabled={loading}>
+              <Icon name="send" size={24} color="#007bff" />
+            </TouchableOpacity>
           </View>
         </View>
-      </Modal>
-    </>
+      </View>
+    </Modal>
   );
 }
 
 const styles = StyleSheet.create({
-  floatingButton: {
-    position: "absolute",
-    bottom: 85,
-    left: 20,
-    backgroundColor: "#007bff",
-    width: 55,
-    height: 55,
-    borderRadius: 30,
-    justifyContent: "center",
-    alignItems: "center",
-    elevation: 6,
-  },
   overlay: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.4)",
@@ -163,6 +196,9 @@ const styles = StyleSheet.create({
     alignSelf: "flex-start",
   },
   msgText: { color: "#000" },
+  formattedText: {
+    color: "#000",
+  },
   inputRow: {
     flexDirection: "row",
     alignItems: "center",
