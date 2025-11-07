@@ -1,3 +1,4 @@
+// HomeScreen.tsx
 import React, { useEffect, useMemo, useState, useCallback } from "react";
 import {
   ScrollView,
@@ -17,10 +18,10 @@ import { BASE_URL } from "../config/api";
 import { auth } from "../config/firebaseConfig";
 import { useUser } from "../context/UserContext";
 import { useNavigation } from "@react-navigation/native";
+import { useRecipes } from "../context/RecipeContext";
 
 const W = Dimensions.get("window").width;
 
-/** Accepts "YYYY-MM-DDTHH:mm:ss" OR "YYYY-MM-DD HH:mm:ss" and returns a local Date */
 function parseLocalDateTime(s: string): Date | null {
   const m = s.match(/^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2}):(\d{2})$/);
   if (!m) return null;
@@ -36,25 +37,9 @@ function endOfDay(d: Date) {
   return new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1, 0, 0, 0, 0);
 }
 
-// Reusable function to fetch recipe data (DB-first, fallback path)
-const fetchRecipeData = async (recipeId: string) => {
-  const tryFetch = async (path: string) => {
-    const res = await fetch(`${BASE_URL}${path}`);
-    if (!res.ok) throw new Error(String(res.status));
-    return res.json();
-  };
-  try {
-    return await tryFetch(`/api/recipes/${encodeURIComponent(recipeId)}`);
-  } catch {
-    return await tryFetch(`/api/recipe/${encodeURIComponent(recipeId)}`);
-  }
-};
-
-// Normalize a local Date (no ms)
 const normalizeLocal = (d: Date) =>
   new Date(d.getFullYear(), d.getMonth(), d.getDate(), d.getHours(), d.getMinutes(), d.getSeconds(), 0);
 
-/** Shape used by AddEditMealModal.initial (id is optional) */
 type ModalInitial = {
   id?: string;
   name: string;
@@ -66,75 +51,75 @@ type ModalInitial = {
   fat?: number | null;
 };
 
-// number (int) or null; never force 0 for missing values
 const toNullableInt = (v: any): number | null => {
   if (v === null || v === undefined || v === "") return null;
   const n = Math.round(Number(v));
-  return Number.isNaN(n) ? null : Math.max(0, n); // clamp negatives to 0 if you prefer that behavior
+  return Number.isNaN(n) ? null : Math.max(0, n);
 };
 
 const toNullableFloat = (v: any): number | null => {
   if (v === null || v === undefined || v === "") return null;
   const n = parseFloat(String(v));
   if (Number.isNaN(n)) return null;
-  return n < 0 ? 0 : n; // keep decimal part intact
+  return n < 0 ? 0 : n;
 };
 
 export default function HomeScreen() {
   const { user } = useUser();
   const userId = user?.firebaseId ?? auth.currentUser?.uid ?? null;
   const navigation = useNavigation<any>();
+  const { addRecipe } = useRecipes();
 
   const [items, setItems] = useState<MealItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [dailyTarget, setDailyTarget] = useState<number>(0);
 
-  // carry macros in recs so the card can pass them through
   const [recs, setRecs] = useState<
     { id: string; name: string; kcal: number | null; carbs?: number | null; protein?: number | null; fat?: number | null; img?: string | null }[]
   >([]);
 
+  const [allRecipes, setAllRecipes] = useState<any[]>([]);
+
   const [showModal, setShowModal] = useState(false);
   const [draft, setDraft] = useState<ModalInitial | null>(null);
 
-  // ---- Load meal logs ------------------------------------------------------
+  // ---- Fetch full recipes once ----
+  const fetchAllRecipes = useCallback(async () => {
+    try {
+      const response = await fetch(`${BASE_URL}/api/recipe/active`);
+      const data = await response.json();
+      setAllRecipes(data);
+      console.log("Full recipes fetched:", data);
+    } catch (err) {
+      console.error("Failed to fetch full recipes:", err);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchAllRecipes();
+  }, [fetchAllRecipes]);
+
+  // ---- Load meal logs ----
   const fetchMealLogs = useCallback(async () => {
     if (!userId) return;
     setLoading(true);
     setError(null);
     try {
-      const url = `${BASE_URL}/api/meallogs/by-firebase/${encodeURIComponent(userId)}`;
-      const res = await fetch(url);
+      const res = await fetch(`${BASE_URL}/api/meallogs/by-firebase/${encodeURIComponent(userId)}`);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data: any[] = await res.json();
 
-      type ApiMeal = {
-        mealLogId: number;
-        foodsConsumed: string;
-        calories: number | null;
-        remarks?: string;
-        timeConsumed: string;
-        carbs?: number | null;
-        protein?: number | null;
-        fat?: number | null;
-      };
-
-      const data: ApiMeal[] = await res.json();
-
-      const mapped: MealItem[] = data.map((m) => {
-        const t = parseLocalDateTime(m.timeConsumed) ?? new Date();
-        return {
-          id: String(m.mealLogId),
-          name: m.foodsConsumed ?? "(Unnamed)",
-          // keep numbers for totals; if you want to preserve nulls, change MealItem.kcal to number|null
-          kcal: m.calories == null ? 0 : Number(m.calories),
-          remarks: m.remarks ?? undefined,
-          time: t,
-          carbs: m.carbs ?? null,
-          protein: m.protein ?? null,
-          fat: m.fat ?? null,
-        };
-      });
+      const mapped: MealItem[] = data.map((m) => ({
+        id: String(m.mealLogId),
+        name: m.foodsConsumed ?? "(Unnamed)",
+        kcal: m.calories == null ? 0 : Number(m.calories),
+        remarks: m.remarks ?? undefined,
+        time: parseLocalDateTime(m.timeConsumed) ?? new Date(),
+        carbs: m.carbs ?? null,
+        protein: m.protein ?? null,
+        fat: m.fat ?? null,
+      }));
 
       mapped.sort((a, b) => b.time.getTime() - a.time.getTime());
       setItems(mapped);
@@ -153,7 +138,6 @@ export default function HomeScreen() {
     fetchMealLogs();
   }, [userId, fetchMealLogs]);
 
-  // ---- Compute today's totals ---------------------------------------------
   const todayItems = useMemo(() => {
     const now = new Date();
     const start = startOfDay(now);
@@ -166,7 +150,7 @@ export default function HomeScreen() {
     [todayItems]
   );
 
-  // ---- Fetch daily goal first ---------------------------------------------
+  // ---- Fetch daily goal ----
   useEffect(() => {
     if (!userId) return;
     (async () => {
@@ -174,28 +158,21 @@ export default function HomeScreen() {
         const res = await fetch(`${BASE_URL}/api/calorie-goal/today?firebaseId=${encodeURIComponent(userId)}`);
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
-        if (typeof data?.dailyTarget === "number") {
-          setDailyTarget(Math.round(data.dailyTarget));
-        } else {
-          setDailyTarget(0);
-        }
+        setDailyTarget(typeof data?.dailyTarget === "number" ? Math.round(data.dailyTarget) : 0);
       } catch {
         setDailyTarget(0);
       }
     })();
   }, [userId]);
 
-  // ---- Fetch 3 meal recommendations (approx to daily target) ---------------
+  // ---- Fetch meal recommendations ----
   useEffect(() => {
     if (!userId) return;
     (async () => {
       try {
         const url = `${BASE_URL}/api/calorie-goal/recommendations?firebaseId=${encodeURIComponent(userId)}&count=3`;
         const res = await fetch(url);
-        if (!res.ok) {
-          const txt = await res.text().catch(() => "");
-          throw new Error(`HTTP ${res.status}${txt ? ` - ${txt}` : ""}`);
-        }
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
         setRecs(
           (Array.isArray(data) ? data : []).map((r: any) => ({
@@ -215,10 +192,11 @@ export default function HomeScreen() {
     })();
   }, [userId]);
 
+  // ---- Modal / Meal log handlers ----
   const handleAdd = () => {
     setDraft({
       name: "",
-      kcal: null, // blank by default (not 0)
+      kcal: null,
       time: normalizeLocal(new Date()),
       remarks: "",
     });
@@ -269,43 +247,55 @@ export default function HomeScreen() {
     fat?: number | null;
     img?: string | null;
   }) => {
+    const fullRecipe = allRecipes.find((r) => String(r.recipeId) === recipe.id);
+    console.log("Full recipe matched:", fullRecipe);
+
+    if (!fullRecipe) {
+      Alert.alert("Recipe not found", "Could not find full recipe details.");
+      return;
+    }
+
     Alert.alert("What would you like to do?", recipe.name, [
       {
         text: "View Recipe",
         onPress: () => {
+          addRecipe({
+            recipeId: fullRecipe.recipeId,
+            title: fullRecipe.title,
+            calories: fullRecipe.calories ?? 0,
+            carbohydrates: fullRecipe.carbohydrates ?? 0,
+            protein: fullRecipe.protein ?? 0,
+            fat: fullRecipe.fat ?? 0,
+            imageLink: fullRecipe.imageLink ?? undefined,
+            ingredients: fullRecipe.ingredients ?? [],
+            instructions: fullRecipe.instructions ?? "",
+            prepTime: fullRecipe.prepTime ?? null,
+            cookTime: fullRecipe.cookTime ?? null,
+            totalTime: fullRecipe.totalTime ?? null,
+          });
           navigation.navigate("RecipeDetailScreen", { recipeId: recipe.id });
         },
       },
       {
         text: "Add to today’s meal log",
-        onPress: async () => {
-          try {
-            const data = await fetchRecipeData(recipe.id);
-
-            const draftFromRecipe: ModalInitial = {
-              // no id here -> modal will POST (add), not PUT (edit)
-              name: data?.title ?? recipe.name,
-              kcal:    toNullableInt(data?.calories ?? recipe.kcal),
-              carbs:   toNullableFloat(data?.carbohydrates ?? recipe.carbs),
-              protein: toNullableFloat(data?.protein ?? recipe.protein),
-              fat:     toNullableFloat(data?.fat ?? recipe.fat),
-              time: normalizeLocal(new Date()),
-              remarks: data?.remarks ?? "",
-            };
-
-            console.log("Draft from recipe:", draftFromRecipe);
-
-            setDraft(draftFromRecipe);
-            setShowModal(true);
-          } catch (e: any) {
-            console.error("Add to log failed", e);
-            Alert.alert("Couldn’t load recipe", e?.message ?? "Please try again.");
-          }
+        onPress: () => {
+          const draftFromRecipe: ModalInitial = {
+            name: fullRecipe.title ?? recipe.name,
+            kcal: toNullableInt(fullRecipe.calories ?? recipe.kcal),
+            carbs: toNullableFloat(fullRecipe.carbohydrates ?? recipe.carbs),
+            protein: toNullableFloat(fullRecipe.protein ?? recipe.protein),
+            fat: toNullableFloat(fullRecipe.fat ?? recipe.fat),
+            time: normalizeLocal(new Date()),
+            remarks: "",
+          };
+          setDraft(draftFromRecipe);
+          setShowModal(true);
         },
       },
       { text: "Cancel", style: "cancel" },
     ]);
   };
+
 
   return (
     <ScrollView style={{ flex: 1, backgroundColor: colors.bgPrimary }} contentContainerStyle={{ flexGrow: 1 }}>
@@ -334,7 +324,7 @@ export default function HomeScreen() {
           onSaved={fetchMealLogs}
           userId={userId}
           baseUrl={BASE_URL}
-          initial={draft} // optional id; modal decides POST vs PUT
+          initial={draft}
         />
       )}
     </ScrollView>
