@@ -14,7 +14,7 @@ import { launchCamera, launchImageLibrary } from "react-native-image-picker";
 import { readFile } from "react-native-fs";
 import { useUser } from "../context/UserContext";
 import { Recipe } from "../types/Recipe";
-import { BASE_URL } from "../config";
+import { BASE_URL } from "../config/api.ts";
 
 interface AddRecipeModalProps {
   visible: boolean;
