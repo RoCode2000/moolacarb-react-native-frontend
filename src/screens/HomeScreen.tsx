@@ -17,7 +17,7 @@ import { colors } from "../theme/colors";
 import { BASE_URL } from "../config/api";
 import { auth } from "../config/firebaseConfig";
 import { useUser } from "../context/UserContext";
-import { useNavigation } from "@react-navigation/native";
+import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import { useRecipes } from "../context/RecipeContext";
 
 const W = Dimensions.get("window").width;
@@ -74,6 +74,7 @@ export default function HomeScreen() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [dailyTarget, setDailyTarget] = useState<number>(0);
+  const [isGoalLoading, setIsGoalLoading] = useState(false);
 
   const [recs, setRecs] = useState<
     { id: string; name: string; kcal: number | null; carbs?: number | null; protein?: number | null; fat?: number | null; img?: string | null }[]
@@ -150,25 +151,40 @@ export default function HomeScreen() {
     [todayItems]
   );
 
-  // ---- Fetch daily goal ----
-  useEffect(() => {
-    if (!userId) return;
-    (async () => {
-      try {
-        const res = await fetch(`${BASE_URL}/api/calorie-goal/today?firebaseId=${encodeURIComponent(userId)}`);
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const data = await res.json();
-        setDailyTarget(typeof data?.dailyTarget === "number" ? Math.round(data.dailyTarget) : 0);
-      } catch {
-        setDailyTarget(0);
-      }
-    })();
-  }, [userId]);
+  // ---- Fetch daily goal when screen gains focus ----
+  useFocusEffect(
+    useCallback(() => {
+      if (!userId) return;
 
-  // ---- Fetch meal recommendations ----
+      let isActive = true;
+      const fetchGoal = async () => {
+        setIsGoalLoading(true);
+        try {
+          const res = await fetch(`${BASE_URL}/api/calorie-goal/today?firebaseId=${encodeURIComponent(userId)}`);
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          const data = await res.json();
+          const newGoal = typeof data?.dailyTarget === "number" ? Math.round(data.dailyTarget) : 0;
+          if (isActive) {
+            setDailyTarget((prev) => (prev !== newGoal ? newGoal : prev));
+          }
+        } catch {
+          if (isActive) setDailyTarget(0);
+        } finally {
+          if (isActive) setIsGoalLoading(false);
+        }
+      };
+
+      fetchGoal();
+      return () => {
+        isActive = false;
+      };
+    }, [userId])
+  );
+
+  // ---- Fetch meal recommendations when daily goal changes ----
   useEffect(() => {
-    if (!userId) return;
-    (async () => {
+    if (!userId || !dailyTarget) return;
+    const fetchRecs = async () => {
       try {
         const url = `${BASE_URL}/api/calorie-goal/recommendations?firebaseId=${encodeURIComponent(userId)}&count=3`;
         const res = await fetch(url);
@@ -189,8 +205,9 @@ export default function HomeScreen() {
         console.log("recs error", e);
         setRecs([]);
       }
-    })();
-  }, [userId]);
+    };
+    fetchRecs();
+  }, [userId, dailyTarget]);
 
   // ---- Modal / Meal log handlers ----
   const handleAdd = () => {
@@ -296,11 +313,14 @@ export default function HomeScreen() {
     ]);
   };
 
-
   return (
     <ScrollView style={{ flex: 1, backgroundColor: colors.bgPrimary }} contentContainerStyle={{ flexGrow: 1 }}>
       <View style={styles.canvas}>
-        <CalorieGoal consumed={consumedToday} goal={dailyTarget} />
+        {isGoalLoading ? (
+          <ActivityIndicator style={{ marginVertical: 12 }} />
+        ) : (
+          <CalorieGoal consumed={consumedToday} goal={dailyTarget} />
+        )}
 
         {recs.length > 0 ? (
           <MealRecom width={W - 32} items={recs} onPressCard={handleRecipeCardPress} />
