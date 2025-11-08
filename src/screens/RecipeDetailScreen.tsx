@@ -127,12 +127,21 @@ const RecipeDetailScreen: React.FC<Props> = ({ route }) => {
     [recipe.instructions]
   );
 
+  const isHttpLink =
+    typeof recipe.imageLink === "string" &&
+    (recipe.imageLink.startsWith("http://") || recipe.imageLink.startsWith("https://"));
+
+  const hasBinary =
+    typeof recipe.imageBinary === "string" &&
+    recipe.imageBinary.trim().length > 0;
+
   const imageSource =
-    recipe.imageLink && recipe.imageLink.length > 0
-      ? { uri: recipe.imageLink }
-      : recipe.imageBinary
-      ? { uri: `data:image/jpeg;base64,${recipe.imageBinary}` }
-      : null;
+    isHttpLink
+      ? { uri: recipe.imageLink }                              // seeded / external
+      : hasBinary
+      ? { uri: `data:image/jpeg;base64,${recipe.imageBinary}` } // user uploads (from backend)
+      : require("../../assets/logo.png");
+
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: "#fff" }}>
