@@ -258,9 +258,6 @@ const LoginScreen = ({ onLoginSuccess }: Props) => {
         <TouchableOpacity style={styles.socialButton} onPress={handleGoogleLogin}>
           <Image source={require('../../assets/google.png')} style={styles.icon} />
         </TouchableOpacity>
-        <TouchableOpacity style={styles.socialButton} onPress={handleFacebookLogin}>
-          <Image source={require('../../assets/facebook.png')} style={styles.icon} />
-        </TouchableOpacity>
       </View>
 
       <View style={styles.inputContainer}>

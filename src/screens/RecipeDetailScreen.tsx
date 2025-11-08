@@ -7,6 +7,9 @@ import {
   StyleSheet,
   TextInput,
   FlatList,
+  SafeAreaView,
+  KeyboardAvoidingView,
+  Platform,
 } from "react-native";
 import Ionicons from "react-native-vector-icons/Ionicons";
 import { colors } from "../theme/colors";
@@ -61,7 +64,7 @@ const RecipeDetailScreen: React.FC<Props> = ({ route }) => {
   const [remote, setRemote] = useState<RecipeDTO | null>(null);
   const [loading, setLoading] = useState(false);
 
-  // if not in context, fetch from backend
+  // fetch from backend if not in context
   useEffect(() => {
     if (recipeFromCtx) {
       setRemote(null);
@@ -71,7 +74,6 @@ const RecipeDetailScreen: React.FC<Props> = ({ route }) => {
     (async () => {
       try {
         setLoading(true);
-        // Try plural, then singular as fallback (matches your backend variants)
         const tryFetch = async (path: string) => {
           const res = await fetch(`${BASE_URL}${path}`);
           if (!res.ok) throw new Error(String(res.status));
@@ -79,9 +81,9 @@ const RecipeDetailScreen: React.FC<Props> = ({ route }) => {
         };
         let data: RecipeDTO | null = null;
         try {
-          data = await tryFetch(`${BASE_URL}/api/recipes/${encodeURIComponent(recipeId)}`);
+          data = await tryFetch(`/api/recipes/${encodeURIComponent(recipeId)}`);
         } catch {
-          data = await tryFetch(`${BASE_URL}/api/recipe/${encodeURIComponent(recipeId)}`);
+          data = await tryFetch(`/api/recipe/${encodeURIComponent(recipeId)}`);
         }
         if (alive) setRemote(data ?? null);
       } catch {
@@ -99,7 +101,9 @@ const RecipeDetailScreen: React.FC<Props> = ({ route }) => {
 
   if (!recipe) {
     return (
-      <View style={{ flex: 1, justifyContent: "center", alignItems: "center", padding: 16 }}>
+      <View
+        style={{ flex: 1, justifyContent: "center", alignItems: "center", padding: 16 }}
+      >
         <Text>{loading ? "Loading recipe..." : "No recipe data available."}</Text>
       </View>
     );
@@ -123,7 +127,6 @@ const RecipeDetailScreen: React.FC<Props> = ({ route }) => {
     [recipe.instructions]
   );
 
-  // pick image source
   const imageSource =
     recipe.imageLink && recipe.imageLink.length > 0
       ? { uri: recipe.imageLink }
@@ -132,144 +135,115 @@ const RecipeDetailScreen: React.FC<Props> = ({ route }) => {
       : null;
 
   return (
-    <FlatList
-      style={styles.container}
-      data={reviews}
-      keyExtractor={(item, idx) => idx.toString()}
-      renderItem={({ item }) => <Text style={styles.reviewItem}>{item}</Text>}
-      ListEmptyComponent={
-        <Text style={styles.reviewItem}>No reviews yet.</Text>
-      }
-      ListHeaderComponent={
-        <View>
-          {imageSource ? (
-            <Image source={imageSource} style={styles.image} />
-          ) : (
-            <View style={[styles.image, { backgroundColor: "#eee" }]} />
-          )}
+    <SafeAreaView style={{ flex: 1, backgroundColor: "#fff" }}>
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 0}
+      >
+        <FlatList
+          style={styles.container}
+          data={reviews}
+          keyExtractor={(item, idx) => idx.toString()}
 
-          <Text style={styles.title}>{recipe.title}</Text>
+          ListHeaderComponent={
+            <View>
+              {imageSource ? (
+                <Image source={imageSource} style={styles.image} />
+              ) : (
+                <View style={[styles.image, { backgroundColor: "#eee" }]} />
+              )}
 
-          <View style={styles.nutritionRow}>
-            {typeof recipe.calories === "number" && (
-              <Text style={styles.nutritionItem}>{recipe.calories} kcal</Text>
-            )}
-            {typeof recipe.protein === "number" && (
-              <Text style={styles.nutritionItem}>{recipe.protein}g Protein</Text>
-            )}
-            {typeof recipe.carbohydrates === "number" && (
-              <Text style={styles.nutritionItem}>
-                {recipe.carbohydrates}g Carbs
-              </Text>
-            )}
-            {typeof recipe.fat === "number" && (
-              <Text style={styles.nutritionItem}>{recipe.fat}g Fat</Text>
-            )}
-            {typeof recipe.saturatedFat === "number" && (
-              <Text style={styles.nutritionItem}>
-                {recipe.saturatedFat}g Sat Fat
-              </Text>
-            )}
-            {typeof recipe.sodium === "number" && (
-              <Text style={styles.nutritionItem}>{recipe.sodium}mg Sodium</Text>
-            )}
-            {typeof recipe.cholesterol === "number" && (
-              <Text style={styles.nutritionItem}>
-                {recipe.cholesterol}mg Cholesterol
-              </Text>
-            )}
-            {typeof recipe.potassium === "number" && (
-              <Text style={styles.nutritionItem}>
-                {recipe.potassium}mg Potassium
-              </Text>
-            )}
-          </View>
+              <Text style={styles.title}>{recipe.title}</Text>
 
-          <View style={styles.infoRow}>
-            {typeof recipe.serving === "number" && (
-              <Text style={styles.infoItem}>Serving: {recipe.serving}</Text>
-            )}
-            {typeof recipe.prepTime === "number" && (
-              <Text style={styles.infoItem}>
-                Prep Time: {recipe.prepTime} mins
-              </Text>
-            )}
-            {typeof recipe.cookTime === "number" && (
-              <Text style={styles.infoItem}>
-                Cook Time: {recipe.cookTime} mins
-              </Text>
-            )}
-            {typeof recipe.restingTime === "number" && (
-              <Text style={styles.infoItem}>
-                Resting Time: {recipe.restingTime} mins
-              </Text>
-            )}
-            {!!recipe.cuisine && (
-              <Text style={styles.infoItem}>Cuisine: {recipe.cuisine}</Text>
-            )}
-            {!!recipe.mealType && (
-              <Text style={styles.infoItem}>Meal Type: {recipe.mealType}</Text>
-            )}
-            {!!recipe.author && (
-              <Text style={styles.infoItem}>Author: {recipe.author}</Text>
-            )}
-            {typeof recipe.overallRating === "number" && (
-              <Text style={styles.infoItem}>
-                Overall Rating: {recipe.overallRating}
-              </Text>
-            )}
-          </View>
+              <View style={styles.nutritionRow}>
+                {typeof recipe.calories === "number" && (
+                  <Text style={styles.nutritionItem}>{recipe.calories} kcal</Text>
+                )}
+                {typeof recipe.protein === "number" && (
+                  <Text style={styles.nutritionItem}>{recipe.protein}g Protein</Text>
+                )}
+                {typeof recipe.carbohydrates === "number" && (
+                  <Text style={styles.nutritionItem}>
+                    {recipe.carbohydrates}g Carbs
+                  </Text>
+                )}
+                {typeof recipe.fat === "number" && (
+                  <Text style={styles.nutritionItem}>{recipe.fat}g Fat</Text>
+                )}
+              </View>
 
-          {!!recipe.description && (
-            <>
-              <Text style={styles.sectionTitle}>Description</Text>
-              <Text style={styles.listItem}>{recipe.description}</Text>
-            </>
-          )}
+              <View style={styles.infoRow}>
+                {typeof recipe.serving === "number" && (
+                  <Text style={styles.infoItem}>Serving: {recipe.serving}</Text>
+                )}
+                {typeof recipe.prepTime === "number" && (
+                  <Text style={styles.infoItem}>
+                    Prep Time: {recipe.prepTime} mins
+                  </Text>
+                )}
+                {typeof recipe.cookTime === "number" && (
+                  <Text style={styles.infoItem}>
+                    Cook Time: {recipe.cookTime} mins
+                  </Text>
+                )}
+                {typeof recipe.restingTime === "number" && (
+                  <Text style={styles.infoItem}>
+                    Resting Time: {recipe.restingTime} mins
+                  </Text>
+                )}
+                {!!recipe.cuisine && (
+                  <Text style={styles.infoItem}>Cuisine: {recipe.cuisine}</Text>
+                )}
+                {!!recipe.mealType && (
+                  <Text style={styles.infoItem}>Meal Type: {recipe.mealType}</Text>
+                )}
+                {!!recipe.author && (
+                  <Text style={styles.infoItem}>Author: {recipe.author}</Text>
+                )}
+                {typeof recipe.overallRating === "number" && (
+                  <Text style={styles.infoItem}>
+                    Overall Rating: {recipe.overallRating}
+                  </Text>
+                )}
+              </View>
 
-          {ingredientsArray.length > 0 && (
-            <>
-              <Text style={styles.sectionTitle}>Ingredients</Text>
-              {ingredientsArray.map((ing, idx) => (
-                <Text key={idx} style={styles.listItem}>
-                  • {ing}
-                </Text>
-              ))}
-            </>
-          )}
+              {!!recipe.description && (
+                <>
+                  <Text style={styles.sectionTitle}>Description</Text>
+                  <Text style={styles.listItem}>{recipe.description}</Text>
+                </>
+              )}
 
-          {instructionsArray.length > 0 && (
-            <>
-              <Text style={styles.sectionTitle}>Instructions</Text>
-              {instructionsArray.map((step, idx) => (
-                <Text key={idx} style={styles.listItem}>
-                  {idx + 1}. {step}
-                </Text>
-              ))}
-            </>
-          )}
+              {ingredientsArray.length > 0 && (
+                <>
+                  <Text style={styles.sectionTitle}>Ingredients</Text>
+                  {ingredientsArray.map((ing, idx) => (
+                    <Text key={idx} style={styles.listItem}>
+                      • {ing}
+                    </Text>
+                  ))}
+                </>
+              )}
 
-          <Text style={styles.sectionTitle}>Reviews</Text>
-        </View>
-      }
-      ListFooterComponent={
-        <View style={styles.reviewInputRow}>
-          <TextInput
-            style={styles.reviewInput}
-            placeholder="Leave a review..."
-            value={reviewText}
-            onChangeText={setReviewText}
-          />
-          <Ionicons
-            name="send"
-            size={28}
-            color="#fff"
-            style={styles.sendButton}
-            onPress={handleSendReview}
-          />
-        </View>
-      }
-    />
+              {instructionsArray.length > 0 && (
+                <>
+                  <Text style={styles.sectionTitle}>Instructions</Text>
+                  {instructionsArray.map((step, idx) => (
+                    <Text key={idx} style={styles.listItem}>
+                      {idx + 1}. {step}
+                    </Text>
+                  ))}
+                </>
+              )}
+
+            </View>
+          }
+
+          contentContainerStyle={{ paddingBottom: 50 }}
+        />
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 };
 
@@ -300,7 +274,11 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     marginBottom: 6,
   },
-  reviewInputRow: { flexDirection: "row", marginTop: 10, alignItems: "center" },
+  reviewInputRow: {
+    flexDirection: "row",
+    marginTop: 10,
+    alignItems: "center",
+  },
   reviewInput: {
     flex: 1,
     borderWidth: 1,
