@@ -1,5 +1,5 @@
 // RecipeScreen.tsx
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import {
   View,
   Text,
@@ -17,7 +17,6 @@ import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import type { RootStackParamList } from "../App";
 import { useRecipes } from "../context/RecipeContext";
-import { useMemo } from "react";
 import { BASE_URL } from "../config/api";
 
 interface Recipe {
@@ -54,30 +53,31 @@ type RecipeScreenNavigationProp = NativeStackNavigationProp<
 
 const RecipeScreen: React.FC = () => {
   const navigation = useNavigation<RecipeScreenNavigationProp>();
-  const [recipes, setRecipes] = useState<Recipe[]>([]);
+  const { user } = useUser();
+  const isPremium = user?.premium === "P";
+  const { addRecipe } = useRecipes();
+
+  const [allRecipes, setAllRecipes] = useState<Recipe[]>([]);
+  const [favouriteRecipes, setFavouriteRecipes] = useState<Recipe[]>([]);
+  const [myRecipes, setMyRecipes] = useState<Recipe[]>([]);
   const [favourites, setFavourites] = useState<string[]>([]);
   const [activeTab, setActiveTab] = useState<"All" | "Favourites" | "My">("All");
   const [search, setSearch] = useState("");
   const [sortAsc, setSortAsc] = useState(true);
   const [showAddDialog, setShowAddDialog] = useState(false);
-  const [favouriteRecipes, setFavouriteRecipes] = useState<Recipe[]>([]);
-  const { user } = useUser();
-  const isPremium = user?.premium === "P";
-  const { addRecipe } = useRecipes();
 
-  // Fetch all recipes
-  const fetchRecipes = async () => {
+  // Fetch functions
+  const fetchAllRecipes = async () => {
     try {
       const response = await fetch(`${BASE_URL}/api/recipe/active`);
       const data: Recipe[] = await response.json();
-      setRecipes(data);
+      setAllRecipes(data);
     } catch (error) {
-      console.error("Failed to fetch recipes:", error);
+      console.error("Failed to fetch all recipes:", error);
     }
   };
 
-  // Fetch favourites for premium users
-  const fetchFavourites = async () => {
+  const fetchFavouriteRecipes = async () => {
     if (!isPremium || !user?.userId) return;
     try {
       const response = await fetch(`${BASE_URL}/api/fav/active`, {
@@ -85,31 +85,24 @@ const RecipeScreen: React.FC = () => {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ userId: user.userId }),
       });
-      const favRecipes: Recipe[] = await response.json();
-      setFavourites(favRecipes.map((r) => r.recipeId));
+      const data: Recipe[] = await response.json();
+      setFavouriteRecipes(data);
+      setFavourites(data.map((r) => r.recipeId));
     } catch (error) {
-      console.error("Failed to fetch favourites:", error);
+      console.error("Failed to fetch favourite recipes:", error);
     }
   };
 
-  useEffect(() => {
-    fetchRecipes();
-    fetchFavourites();
-  }, []);
-
-  useEffect(() => {
-    if (activeTab === "Favourites") {
-      fetchFavouriteRecipes();
+  const fetchMyRecipes = async () => {
+    if (!user?.userId) return;
+    try {
+      const response = await fetch(`${BASE_URL}/api/recipe/${user.userId}`);
+      const data: Recipe[] = await response.json();
+      setMyRecipes(data);
+    } catch (error) {
+      console.error("Failed to fetch my recipes:", error);
     }
-  }, [activeTab]);
-
-  useEffect(() => {
-    if (activeTab === "My") {
-      fetchMyRecipes();
-    } else {
-      fetchRecipes(); // All or Favourites tab
-    }
-  }, [activeTab]);
+  };
 
   const toggleFavourite = async (id: string) => {
     if (!isPremium || !user?.userId) return;
@@ -128,102 +121,39 @@ const RecipeScreen: React.FC = () => {
     }
   };
 
-  // Filter recipes based on active tab
-//   const filteredRecipes =
-//     activeTab === "Favourites"
-//       ? favouriteRecipes
-//       : activeTab === "My"
-//       ? recipes.filter((r) => r.author === user?.userId)
-//       : recipes;// search
-//
-//   const searchedRecipes = filteredRecipes.filter((r) =>
-//     r.title.toLowerCase().includes(search.toLowerCase())
-//   );
-//
-//   const sortedRecipes = searchedRecipes.sort((a, b) =>
-//     sortAsc ? a.title.localeCompare(b.title) : b.title.localeCompare(a.title)
-//   );
-  const filteredRecipes =
-    activeTab === "Favourites"
-      ? favouriteRecipes || []
-      : activeTab === "My"
-      ? (recipes || []).filter((r) => r.author === user?.userId)
-      : recipes || [];
+  // Fetch recipes whenever tab changes
+  useEffect(() => {
+    if (activeTab === "All") fetchAllRecipes();
+    else if (activeTab === "Favourites") fetchFavouriteRecipes();
+    else if (activeTab === "My") fetchMyRecipes();
+  }, [activeTab]);
 
-  const searchedRecipes = (filteredRecipes || []).filter((r) =>
+  // Filtered + sorted recipes
+  const filteredRecipes =
+    activeTab === "All"
+      ? allRecipes
+      : activeTab === "Favourites"
+      ? favouriteRecipes
+      : myRecipes;
+
+  const searchedRecipes = filteredRecipes.filter((r) =>
     r.title.toLowerCase().includes(search.toLowerCase())
   );
 
-  const sortedRecipes = (searchedRecipes || []).sort((a, b) =>
+  const sortedRecipes = searchedRecipes.sort((a, b) =>
     sortAsc ? a.title.localeCompare(b.title) : b.title.localeCompare(a.title)
   );
 
-  const limitedRecipes =
-    !isPremium && (sortedRecipes?.length ?? 0) > 0
-      ? [...sortedRecipes].sort(() => 0.5 - Math.random()).slice(0, 3)
-      : sortedRecipes || [];
-
-   const visibleRecipes = useMemo(() => {
-         if (isPremium) {
-           return sortedRecipes; // premium sees all
-         }
-         // free users → pick 3 random recipes
-         if (sortedRecipes.length <= 3) return sortedRecipes;
-         const shuffled = [...sortedRecipes].sort(() => Math.random() - 0.5);
-         return shuffled.slice(0, 3);
-       }, [sortedRecipes, isPremium]);
-
-  const fetchFavouriteRecipes = async () => {
-    if (!isPremium || !user?.userId) return;
-    try {
-      const response = await fetch(`${BASE_URL}/api/fav/active`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId: user.userId }),
-      });
-      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-      const data: Recipe[] = await response.json();
-      setFavouriteRecipes(data);
-    } catch (error) {
-      console.error("Failed to fetch favourite recipes:", error);
-    }
-  };
-
-
-  const fetchMyRecipes = async () => {
-    if (!user?.userId) return;
-    try {
-      const response = await fetch(`${BASE_URL}/api/recipe/${user.userId}`);
-      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-      const data: Recipe[] = await response.json();
-
-      setRecipes(prev => {
-        const others = prev.filter(r => r.author !== user.userId);
-        return [...others, ...data];
-      });
-    } catch (error) {
-      console.error("Failed to fetch my recipes:", error);
-    }
-  };
-
+  // Render
   const renderRecipe = ({ item }: { item: Recipe }) => {
-const isHttpLink =
-  typeof item.imageLink === "string" &&
-  (item.imageLink.startsWith("http://") || item.imageLink.startsWith("https://"));
+    const hasBinary =
+      typeof item.imageBinary === "string" && item.imageBinary.trim().length > 0;
+    const imageSource = hasBinary
+      ? { uri: `data:image/jpeg;base64,${item.imageBinary}` }
+      : require("../../assets/logo.png");
 
-const hasBinary =
-  typeof item.imageBinary === "string" &&
-  item.imageBinary.trim().length > 0;
-
-const imageSource =
-  isHttpLink
-    ? { uri: item.imageLink }                              // seeded / external
-    : hasBinary
-    ? { uri: `data:image/jpeg;base64,${item.imageBinary}` } // user uploads (from backend)
-    : require("../../assets/logo.png");                     // fallback
-
-//     const imageSource = { uri: `data:image/jpeg;base64,${item.imageBinary}` };
     const isFav = favourites.includes(item.recipeId);
+
     return (
       <View style={styles.card}>
         {isPremium && (
@@ -255,11 +185,13 @@ const imageSource =
               </View>
             </View>
 
-            <TouchableOpacity style={styles.button}
-            onPress={() => {
-                          addRecipe(item); // store in context
-                          navigation.navigate("RecipeDetailScreen", { recipeId: item.recipeId });
-                        }}>
+            <TouchableOpacity
+              style={styles.button}
+              onPress={() => {
+                addRecipe(item);
+                navigation.navigate("RecipeDetailScreen", { recipeId: item.recipeId });
+              }}
+            >
               <Text style={styles.buttonText}>View Recipe</Text>
             </TouchableOpacity>
           </View>
@@ -312,7 +244,7 @@ const imageSource =
       </View>
 
       <FlatList
-        data={limitedRecipes ?? []}
+        data={sortedRecipes}
         keyExtractor={(item) => item.recipeId.toString()}
         renderItem={renderRecipe}
         contentContainerStyle={{ paddingBottom: 50 }}
@@ -323,48 +255,62 @@ const imageSource =
           <Text style={styles.unlockText}>🔓 Sign Up to Unlock More Recipes</Text>
         </TouchableOpacity>
       )}
-    {activeTab === "My" && isPremium && (
-          <TouchableOpacity
-            style={styles.fabButton}
-            onPress={() => setShowAddDialog(true)}
-          >
-            <Ionicons name="add" size={28} color="#fff" />
-          </TouchableOpacity>
-        )}
-    <AddRecipeModal
-      visible={showAddDialog}
-      onClose={() => setShowAddDialog(false)}
-      onSave={() => fetchRecipes()}
-    />
-    </View>
 
+      {activeTab === "My" && isPremium && (
+        <TouchableOpacity
+          style={styles.fabButton}
+          onPress={() => setShowAddDialog(true)}
+        >
+          <Ionicons name="add" size={28} color="#fff" />
+        </TouchableOpacity>
+      )}
+
+      <AddRecipeModal
+        visible={showAddDialog}
+        onClose={() => setShowAddDialog(false)}
+        onSave={() => {
+          if (activeTab === "My") fetchMyRecipes();
+          else fetchAllRecipes();
+        }}
+      />
+    </View>
   );
 };
-
 
 export default RecipeScreen;
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#fff", padding: 10 },
-  card: { flexDirection: "row", marginBottom: 15, backgroundColor: "#f9f9f9", borderRadius: 12, overflow: "hidden", elevation: 2, position: "relative", height: 140 },
-  image: { width: 100, height:"100%" },
-  heartIcon: { position: "absolute", top: -4, right: 8, backgroundColor: "rgba(255,255,255,0.9)", borderRadius: 20, padding: 6, zIndex: 20 },
+  card: {
+    flexDirection: "row",
+    marginBottom: 15,
+    backgroundColor: "#f9f9f9",
+    borderRadius: 12,
+    overflow: "hidden",
+    elevation: 2,
+    position: "relative",
+    height: 140,
+  },
+  image: { width: 100, height: "100%" },
+  heartIcon: {
+    position: "absolute",
+    top: -4,
+    right: 8,
+    backgroundColor: "rgba(255,255,255,0.9)",
+    borderRadius: 20,
+    padding: 6,
+    zIndex: 20,
+  },
   cardContent: { flex: 1, padding: 10, flexDirection: "column", justifyContent: "space-between" },
   title: { fontWeight: "bold", fontSize: 16, paddingRight: 36 },
-  tagsAndButton: { marginTop: "auto"},
-  tagsRow: { flexDirection: "row", justifyContent: "space-between", marginBottom: 7},
+  tagsAndButton: { marginTop: "auto" },
+  tagsRow: { flexDirection: "row", justifyContent: "space-between", marginBottom: 7 },
   tag: { backgroundColor: "#e0f0ff", marginRight: 8, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, fontSize: 12 },
   tabsRow: { flexDirection: "row", marginBottom: 10 },
-  tabButton: {
-    flex: 1,
-    paddingVertical: 10,
-    borderBottomWidth: 2,
-    borderBottomColor: "transparent",
-    alignItems: "center",
-  },
+  tabButton: { flex: 1, paddingVertical: 10, borderBottomWidth: 2, borderBottomColor: "transparent", alignItems: "center" },
   activeTab: { borderBottomColor: colors.primaryGreen },
   tabText: { fontWeight: "bold", color: "#333" },
-  button: { backgroundColor: "#001f3f", padding: 6, marginTop: 5, borderRadius: 6, alignItems: "center", marginTop: "auto", marginBottom: 1},
+  button: { backgroundColor: "#001f3f", padding: 6, borderRadius: 6, alignItems: "center", marginTop: "auto", marginBottom: 1 },
   buttonText: { color: "#fff" },
   unlockButton: { backgroundColor: "#d0f0d0", padding: 12, borderRadius: 6, alignItems: "center", marginTop: 10 },
   unlockText: { color: "#003300", fontWeight: "bold" },
@@ -390,7 +336,4 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 4,
   },
-
 });
-
-
