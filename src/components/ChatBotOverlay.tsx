@@ -1,4 +1,4 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import {
   View,
   Text,
@@ -9,28 +9,49 @@ import {
   StyleSheet,
 } from "react-native";
 import Icon from "react-native-vector-icons/MaterialCommunityIcons";
-import axios from "axios";
 
-// const FLOWISE_API_URL =
-//   `http://4.190.64.83:3000/api/v1/prediction/49b93980-e061-4950-a5f1-a5badc81fd64`;
-const FLOWISE_API_URL =
-  `https://moolacarb.com/api/v1/prediction/49b93980-e061-4950-a5f1-a5badc81fd64`;
+// ===== Flowise endpoint =====
+const FLOW_ID = "49b93980-e061-4950-a5f1-a5badc81fd64";
+const FLOWISE_API_URL = 'https://moolacarb.com/api/v1/prediction/49b93980-e061-4950-a5f1-a5badc81fd64';
 
+async function chatWithHistory(flowId: string, question: string, history: any[]) {
+  const url = 'https://moolacarb.com/api/v1/prediction/49b93980-e061-4950-a5f1-a5badc81fd64';
 
-// Helper to format text with * and ** patterns
+  const payload = {
+    question: question,
+    history: history,
+  };
+
+  try {
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error("Error:", error);
+    return null;
+  }
+}
+
 const formatMessage = (text: string) => {
-  // Split text into lines
   return text.split("\n").map((line, index) => {
     const trimmed = line.trim();
     let content: any[] = [];
 
-    // If line starts with a single asterisk, treat it as a bullet point
     if (trimmed.startsWith("* ")) {
       const processed = trimmed.replace(/^\* /, "• ");
       const parts = processed.split(/\*\*(.*?)\*\*/g);
       parts.forEach((part, i) => {
         if (i % 2 === 1) {
-          // Bold section
           content.push(
             <Text key={i} style={{ fontWeight: "bold" }}>
               {part}
@@ -41,7 +62,6 @@ const formatMessage = (text: string) => {
         }
       });
     } else {
-      // Normal line (with possible bold)
       const parts = trimmed.split(/\*\*(.*?)\*\*/g);
       parts.forEach((part, i) => {
         if (i % 2 === 1) {
@@ -71,40 +91,44 @@ export default function ChatBotOverlay({
   visible: boolean;
   onClose: () => void;
 }) {
-  const [messages, setMessages] = useState<{ role: string; content: string }[]>(
-    []
-  );
+  const [messages, setMessages] = useState<
+    { role: "userMessage" | "apiMessage"; content: string }[]
+  >([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
-
   const flatListRef = useRef<FlatList>(null);
+
+  // Scroll to bottom whenever messages update
+  useEffect(() => {
+    flatListRef.current?.scrollToEnd({ animated: true });
+  }, [messages]);
 
   const sendMessage = async () => {
     if (!input.trim()) return;
-    const userMessage = { role: "user", content: input };
-    setMessages((prev) => [...prev, userMessage]);
+
+    const userMessage = { role: "userMessage", content: input };
+    const updatedHistory = [...messages, userMessage]; // include current conversation
+
+    setMessages(updatedHistory);
     setInput("");
     setLoading(true);
 
-    try {
-      const response = await axios.post(FLOWISE_API_URL, {
-        question: input,
-      });
+    const response = await chatWithHistory(FLOW_ID, input, updatedHistory);
 
+    if (response && response.text) {
       const botMessage = {
-        role: "bot",
-        content: response.data?.text || "No response",
+        role: "apiMessage" as const,
+        content: response.text,
       };
-
       setMessages((prev) => [...prev, botMessage]);
-    } catch (err) {
+    } else {
       setMessages((prev) => [
         ...prev,
-        { role: "bot", content: "Error connecting to chatbot." },
+        { role: "apiMessage", content: "Error connecting to chatbot." },
       ]);
-    } finally {
-      setLoading(false);
     }
+
+    setLoading(false);
   };
 
   return (
@@ -126,11 +150,15 @@ export default function ChatBotOverlay({
               <View
                 style={[
                   styles.message,
-                  item.role === "user" ? styles.userMsg : styles.botMsg,
+                  item.role === "userMessage"
+                    ? styles.userMsg
+                    : styles.botMsg,
                 ]}
               >
-                {item.role === "bot" ? (
-                  <View style={styles.formattedText}>{formatMessage(item.content)}</View>
+                {item.role === "apiMessage" ? (
+                  <View style={styles.formattedText}>
+                    {formatMessage(item.content)}
+                  </View>
                 ) : (
                   <Text style={[styles.msgText, { color: "#fff" }]}>
                     {item.content}
@@ -138,12 +166,6 @@ export default function ChatBotOverlay({
                 )}
               </View>
             )}
-            onContentSizeChange={() =>
-              flatListRef.current?.scrollToEnd({ animated: true })
-            }
-            onLayout={() =>
-              flatListRef.current?.scrollToEnd({ animated: true })
-            }
           />
 
           <View style={styles.inputRow}>
@@ -152,6 +174,7 @@ export default function ChatBotOverlay({
               placeholder="Type your message..."
               value={input}
               onChangeText={setInput}
+              editable={!loading}
             />
             <TouchableOpacity onPress={sendMessage} disabled={loading}>
               <Icon name="send" size={24} color="#007bff" />
