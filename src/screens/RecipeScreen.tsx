@@ -303,7 +303,7 @@ const styles = StyleSheet.create({
   image: { width: 100, height: "100%" },
   heartIcon: {
     position: "absolute",
-    top: -4,
+    top: 2,
     right: 8,
     backgroundColor: "rgba(255,255,255,0.9)",
     borderRadius: 20,
