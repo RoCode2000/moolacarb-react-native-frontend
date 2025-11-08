@@ -2,6 +2,7 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ActivityIndicator, ScrollView } from 'react-native';
 import { useUser } from '../context/UserContext';
+import { BASE_URL } from "../config/api";
 
 type FeatureConfig = {
   featureConfigId: number;
@@ -27,12 +28,12 @@ export default function SubscriptionTierScreen() {
     const fetchFeatures = async () => {
       try {
         // Fetch FREE plan features
-        const freeRes = await fetch("http://10.0.2.2:8080/api/features?userType=FREE");
+        const freeRes = await fetch(`${BASE_URL}/api/features?userType=FREE`);
         const freeData: FeatureConfig[] = await freeRes.json();
         setFreeFeatures(freeData);
 
         // Fetch PREMIUM plan features
-        const premiumRes = await fetch("http://10.0.2.2:8080/api/features?userType=PREMIUM");
+        const premiumRes = await fetch(`${BASE_URL}/api/features?userType=PREMIUM`);
         const premiumData: FeatureConfig[] = await premiumRes.json();
         setPremiumFeatures(premiumData);
       } catch (error) {

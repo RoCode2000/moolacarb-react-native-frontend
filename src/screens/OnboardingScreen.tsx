@@ -13,6 +13,7 @@ import {
 import DateTimePicker, { AndroidNativeProps, IOSNativeProps } from "@react-native-community/datetimepicker";
 import { auth } from "../config/firebaseConfig";
 import { useUser } from "../context/UserContext";
+import { BASE_URL } from "../config/api";
 
 type Props = {
   navigation?: any;
@@ -63,7 +64,7 @@ export default function OnboardingScreen({ onOnboardingComplete }: Props) {
     if (heightNum !== undefined) payload.height = heightNum;
 
     try {
-      const response = await fetch("http://10.0.2.2:8080/api/user/onboarding", {
+      const response = await fetch(`${BASE_URL}/api/user/onboarding`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -71,7 +72,7 @@ export default function OnboardingScreen({ onOnboardingComplete }: Props) {
       if (!response.ok) throw new Error(await response.text());
 
       // refresh user
-      const me = await fetch(`http://10.0.2.2:8080/api/user/me/${currentUser.uid}`);
+      const me = await fetch(`${BASE_URL}/api/user/me/${currentUser.uid}`);
       if (!me.ok) throw new Error("Failed to fetch user after onboarding");
       const backendUser = await me.json();
       setUser(backendUser);

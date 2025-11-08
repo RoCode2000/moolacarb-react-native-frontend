@@ -21,6 +21,9 @@ import {
 import { auth } from '../config/firebaseConfig';
 import '../config/googleConfig';
 import { GoogleSignin } from '@react-native-google-signin/google-signin';
+import { colors } from '../theme/colors';
+
+import { BASE_URL } from '../config/api';
 
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -55,7 +58,7 @@ const LoginScreen = ({ onLoginSuccess }: Props) => {
         console.log("Email:", user.email);
         console.log(user);
 
-        const response = await fetch(`http://10.0.2.2:8080/api/user/me/${user.uid}`, {
+        const response = await fetch(`${BASE_URL}/api/user/me/${user.uid}`, {
           method: "GET",
           headers: {
             "Content-Type": "application/json"
@@ -123,7 +126,7 @@ const LoginScreen = ({ onLoginSuccess }: Props) => {
           photoUrl: userInfo.data.user.photo
         };
 
-        const response = await fetch("http://10.0.2.2:8080/api/user/google-login", {
+        const response = await fetch(`${BASE_URL}/api/user/google-login`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
@@ -255,30 +258,27 @@ const LoginScreen = ({ onLoginSuccess }: Props) => {
         <TouchableOpacity style={styles.socialButton} onPress={handleGoogleLogin}>
           <Image source={require('../../assets/google.png')} style={styles.icon} />
         </TouchableOpacity>
-        <TouchableOpacity style={styles.socialButton} onPress={handleFacebookLogin}>
-          <Image source={require('../../assets/facebook.png')} style={styles.icon} />
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.socialButton}>
-          <Image source={require('../../assets/apple.png')} style={styles.icon} />
-        </TouchableOpacity>
       </View>
 
       <View style={styles.inputContainer}>
         <Icon name="envelope" size={18} style={styles.inputIcon} />
         <TextInput
           placeholder="Email"
-          style={styles.input}
+          style={[styles.input, { color: '#888' }]}
           value={email}
           onChangeText={setEmail}
           keyboardType="email-address"
+          placeholderTextColor="#888"
         />
+
       </View>
 
       <View style={styles.inputContainer}>
         <Icon name="lock" size={18} style={styles.inputIcon} />
         <TextInput
           placeholder="Password"
-          style={styles.input}
+          style={[styles.input, { color: '#888' }]}
+          placeholderTextColor="#888"
           value={password}
           onChangeText={setPassword}
           secureTextEntry

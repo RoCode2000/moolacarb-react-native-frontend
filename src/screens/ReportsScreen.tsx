@@ -22,7 +22,6 @@ type MealItem = {
   kcal: number;
   time: Date;
   remarks?: string;
-  // Macros - currently hardcoded
   protein?: number;
   carbs?: number;
   fat?: number;
@@ -34,7 +33,6 @@ type ApiMeal = {
   calories: number;
   remarks?: string;
   timeConsumed: string;
-  // Macros - currently hardcoded
   protein?: number;
   carbs?: number;
   fat?: number;
@@ -144,9 +142,9 @@ export default function Report() {
         kcal: Number(m.calories ?? 0),
         remarks: m.remarks ?? undefined,
         time: parseLocalDateTime(m.timeConsumed),
-        protein: m.protein ?? undefined,
-        carbs: m.carbs ?? undefined,
-        fat: m.fat ?? undefined,
+        protein: m.protein != null ? Number(m.protein) : undefined,
+        carbs:   m.carbs   != null ? Number(m.carbs)   : undefined,
+        fat:     m.fat     != null ? Number(m.fat)     : undefined,
       }));
 
       mapped.sort((a, b) => b.time.getTime() - a.time.getTime());
@@ -163,24 +161,36 @@ export default function Report() {
   }, [fetchAll]);
 
   /** ===== Day-level aggregates (kcal & macros) ===== */
-  type DayAgg = { kcal: number; protein: number | null; carbs: number | null; fat: number | null };
+  type DayAgg = {
+    kcal: number;
+    protein: number; pc: number; // pc = count of entries that had protein
+    carbs: number;   cc: number;
+    fat: number;     fc: number;
+  };
+
   const dayAgg = useMemo(() => {
     const map = new Map<string, DayAgg>();
     for (const it of items) {
       const key = ymdKey(it.time);
-      const prev = map.get(key) ?? { kcal: 0, protein: 490, carbs: 374, fat: 26 };
-      const p = it.protein ?? null;
-      const c = it.carbs ?? null;
-      const f = it.fat ?? null;
+      const prev = map.get(key) ?? { kcal: 0, protein: 0, pc: 0, carbs: 0, cc: 0, fat: 0, fc: 0 };
+
+      const p = it.protein;
+      const c = it.carbs;
+      const f = it.fat;
+
       map.set(key, {
         kcal: prev.kcal + (Number.isFinite(it.kcal) ? it.kcal : 0),
-        protein: p == null || prev.protein == null ? (p == null && prev.protein == null ? null : (prev.protein ?? 0) + (p ?? 0)) : prev.protein + p,
-        carbs:   c == null || prev.carbs   == null ? (c == null && prev.carbs   == null ? null : (prev.carbs   ?? 0) + (c ?? 0))   : prev.carbs + c,
-        fat:     f == null || prev.fat     == null ? (f == null && prev.fat     == null ? null : (prev.fat     ?? 0) + (f ?? 0))   : prev.fat + f,
+        protein: prev.protein + (p != null ? Number(p) : 0),
+        carbs:   prev.carbs   + (c != null ? Number(c) : 0),
+        fat:     prev.fat     + (f != null ? Number(f) : 0),
+        pc: prev.pc + (p != null ? 1 : 0),
+        cc: prev.cc + (c != null ? 1 : 0),
+        fc: prev.fc + (f != null ? 1 : 0),
       });
     }
     return map;
   }, [items]);
+
 
   const diaryItems = useMemo(
     () => items.filter((x) => isSameLocalDay(x.time, cursorDay)).sort((a, b) => a.time.getTime() - b.time.getTime()),
@@ -197,7 +207,7 @@ export default function Report() {
   const weekSeries = useMemo(
     () =>
       weekDays.map(d => {
-        const ag = dayAgg.get(ymdKey(d)) ?? { kcal: 0, protein: null, carbs: null, fat: null };
+        const ag = dayAgg.get(ymdKey(d)) ?? { kcal: 0, protein: 0, pc: 0, carbs: 0, cc: 0, fat: 0, fc: 0 };
         return { date: d, total: ag.kcal };
       }),
     [weekDays, dayAgg]
@@ -365,7 +375,7 @@ export default function Report() {
                     style={[
                       styles.progressBarFill,
                       { width: `${Math.min(100, (totalDay / DEFAULT_GOAL) * 100)}%`,
-                        backgroundColor: totalDay <= DEFAULT_GOAL ? colors.primaryGreen : colors.primaryBlue
+                        backgroundColor: colors.primaryGreen
                       },
                     ]}
                   />
@@ -394,27 +404,75 @@ export default function Report() {
 
             <View style={styles.card}>
               <Text style={[styles.kpiLabel, { marginBottom: 8 }]}>Calorie Share</Text>
+
               {shareRows.length === 0 ? (
                 <Text style={{ color: colors.mute }}>No meals yet.</Text>
               ) : (
-                <View>
-                  {shareRows.map((row) => (
-                    <View key={row.id} style={{ marginBottom: 10 }}>
-                      <View style={styles.shareTop}>
-                        <View style={styles.swatchGreen} />
-                        <Text style={styles.legendTxt} numberOfLines={1}>{row.name}</Text>
-                        <Text style={[styles.legendTxt, { marginLeft: "auto" }]}>
-                          {row.kcal} kcal{SHOW_SHARE_PERCENT ? ` • ${Math.round(row.pct)}%` : ""}
-                        </Text>
-                      </View>
-                      <View style={styles.shareBarBg}>
-                        <View style={[styles.shareBarFill, { width: `${Math.max(4, row.pct)}%` }]} />
-                      </View>
+                <>
+                  <View style={styles.stackedBarSlim}>
+                    {shareRows.map((row, idx) => {
+                      // ensure very tiny segments show up
+                      const widthPct = Math.max(3, row.pct);
+
+                      // fade from strong to light
+                      // adjust the ramp if you have many items
+                      const ramps = [1.0, 0.85, 0.72, 0.6, 0.5, 0.42, 0.36, 0.3];
+                      const alpha = ramps[Math.min(idx, ramps.length - 1)];
+
+                      return (
+                        <View
+                          key={row.id}
+                          style={[
+                            styles.stackedSegmentSlim,
+                            {
+                              width: `${widthPct}%`,
+                              backgroundColor: colors.primaryGreen,
+                              opacity: alpha,
+                            },
+                          ]}
+                        />
+                      );
+                    })}
+
+                    {/* optional separators (very subtle) */}
+                    <View pointerEvents="none" style={styles.stackedSeparators}>
+                      {shareRows.map((row, idx) => {
+                        if (idx === shareRows.length - 1) return null;
+                        const leftPct =
+                          shareRows
+                            .slice(0, idx + 1)
+                            .reduce((s, r) => s + Math.max(3, r.pct), 0);
+                        return <View key={idx} style={[styles.separator, { left: `${leftPct}%` }]} />;
+                      })}
                     </View>
-                  ))}
-                </View>
+                  </View>
+
+                  {/* compact legend */}
+                  <View style={{ marginTop: 8, gap: 6 }}>
+                    {shareRows.map((row, idx) => {
+                      const ramps = [1.0, 0.85, 0.72, 0.6, 0.5, 0.42, 0.36, 0.3];
+                      const alpha = ramps[Math.min(idx, ramps.length - 1)];
+                      return (
+                        <View key={row.id} style={styles.legendRow}>
+                          <View
+                            style={[
+                              styles.legendSwatch,
+                              { backgroundColor: colors.primaryGreen, opacity: alpha },
+                            ]}
+                          />
+                          <Text style={styles.legendTxt} numberOfLines={1}>{row.name}</Text>
+                          <Text style={[styles.legendTxt, { marginLeft: "auto" }]}>
+                            {row.kcal} kcal
+                          </Text>
+                        </View>
+                      );
+                    })}
+                  </View>
+                </>
               )}
             </View>
+
+
 
             <View style={styles.listHeader}>
               <Text style={styles.sectionTitle}>Meal Log</Text>
@@ -507,9 +565,7 @@ export default function Report() {
                             ]}
                           />
                         </Pressable>
-                        <Text style={[styles.barLabel, { width: 24 }]}>
-                          {WEEKDAYS[d.date.getDay() === 0 ? 6 : d.date.getDay() - 1]}
-                        </Text>
+                        <Text style={[styles.barLabel, { width: 24 }]}>{WEEKDAYS[i]}</Text>
                         </View>
 
                     );
@@ -743,7 +799,6 @@ const styles = StyleSheet.create({
   progressBarFill: { height: 10, backgroundColor: colors.primaryGreen },
   progressTxt: { marginTop: 6, color: colors.primaryBlue, fontWeight: "700", opacity: 0.7 },
 
-  // Macros - currently hardcoded
   macrosRow: { flexDirection: "row", gap: 12 },
   macroCol: { flex: 1, padding: 8, borderRadius: 8, backgroundColor: colors.bgLighter },
   macroLabel: { color: colors.primaryBlue, opacity: 0.7, fontWeight: "700", fontSize: 12 },
@@ -764,6 +819,32 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primaryGreen,
   },
   legendTxt: { color: colors.primaryBlue, fontSize: 12, fontWeight: "700" },
+
+  stackedBarSlim: {
+    height: 8,
+    borderRadius: 999,
+    overflow: "hidden",
+    backgroundColor: colors.bgLighter,
+    borderWidth: 1,
+    borderColor: colors.bgLighter,
+    flexDirection: "row",
+  },
+  stackedSegmentSlim: {
+    height: "100%",
+  },
+  stackedSeparators: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  separator: {
+    position: "absolute",
+    top: 0,
+    bottom: 0,
+    width: 1,
+    backgroundColor: colors.bgLightest,
+    opacity: 0.6,
+  },
+  legendRow: { flexDirection: "row", alignItems: "center", gap: 8 },
+  legendSwatch: { width: 10, height: 10, borderRadius: 2 },
 
   chartLegend: { color: colors.primaryBlue, fontSize: 12, marginBottom: 8, textAlign: "center", opacity: 0.7 },
   chartRow: { flexDirection: "row", alignItems: "flex-end" },

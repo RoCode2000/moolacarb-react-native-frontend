@@ -29,6 +29,10 @@ import { onAuthStateChanged, User } from 'firebase/auth';
 import { UserProvider } from "./src/context/UserContext";
 import { RecipeProvider } from './src/context/RecipeContext';
 
+import {Appearance} from 'react-native';
+
+Appearance.setColorScheme?.('light');
+
 export type RootStackParamList = {
   Login: undefined;
   Signup: undefined;
