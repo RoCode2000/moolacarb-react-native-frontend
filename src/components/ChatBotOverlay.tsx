@@ -12,7 +12,7 @@ import Icon from "react-native-vector-icons/MaterialCommunityIcons";
 import axios from "axios";
 
 const FLOWISE_API_URL =
-  "http://10.0.2.2:3000/api/v1/prediction/af20da84-f6c4-486a-84f7-5f1a40a9fa42";
+  `http://4.190.64.83:3000/api/v1/prediction/49b93980-e061-4950-a5f1-a5badc81fd64`;
 
 // Helper to format text with * and ** patterns
 const formatMessage = (text: string) => {
