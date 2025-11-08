@@ -11,8 +11,11 @@ import {
 import Icon from "react-native-vector-icons/MaterialCommunityIcons";
 import axios from "axios";
 
+// const FLOWISE_API_URL =
+//   `http://4.190.64.83:3000/api/v1/prediction/49b93980-e061-4950-a5f1-a5badc81fd64`;
 const FLOWISE_API_URL =
-  `http://4.190.64.83:3000/api/v1/prediction/49b93980-e061-4950-a5f1-a5badc81fd64`;
+  `https://moolacarb.com/api/v1/prediction/49b93980-e061-4950-a5f1-a5badc81fd64`;
+
 
 // Helper to format text with * and ** patterns
 const formatMessage = (text: string) => {

@@ -146,11 +146,20 @@ const RecipeScreen: React.FC = () => {
 
   // Render
   const renderRecipe = ({ item }: { item: Recipe }) => {
-    const hasBinary =
-      typeof item.imageBinary === "string" && item.imageBinary.trim().length > 0;
-    const imageSource = hasBinary
-      ? { uri: `data:image/jpeg;base64,${item.imageBinary}` }
-      : require("../../assets/logo.png");
+const isHttpLink =
+  typeof item.imageLink === "string" &&
+  (item.imageLink.startsWith("http://") || item.imageLink.startsWith("https://"));
+
+const hasBinary =
+  typeof item.imageBinary === "string" &&
+  item.imageBinary.trim().length > 0;
+
+const imageSource =
+  isHttpLink
+    ? { uri: item.imageLink }                              // seeded / external
+    : hasBinary
+    ? { uri: `data:image/jpeg;base64,${item.imageBinary}` } // user uploads (from backend)
+    : require("../../assets/logo.png");                     // fallback
 
     const isFav = favourites.includes(item.recipeId);
 

@@ -1,16 +1,27 @@
 <?xml version="1.0" encoding="utf-8"?>
 <network-security-config>
-    <!-- Allow cleartext HTTP (your dev backend or localhost) -->
-    <base-config cleartextTrafficPermitted="true" />
+    <!-- 🔒 Default: disallow cleartext HTTP -->
+    <base-config cleartextTrafficPermitted="false">
+        <trust-anchors>
+            <!-- Use system trusted CAs (includes Let's Encrypt) -->
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
 
-    <!-- Allow your backend IP (Azure / Oracle VM) -->
-    <domain-config cleartextTrafficPermitted="true">
-        <domain includeSubdomains="true">4.190.64.83</domain>
-<!--        <domain includeSubdomains="true">213.35.111.133</domain>-->
+    <!-- ✅ Allow your production HTTPS domain -->
+    <domain-config cleartextTrafficPermitted="false">
+        <domain includeSubdomains="true">moolacarb.com</domain>
     </domain-config>
 
     <!-- ✅ Allow HTTPS images from singaporeanmalaysianrecipes.com -->
-    <domain-config cleartextTrafficPermitted="true">
+    <domain-config cleartextTrafficPermitted="false">
         <domain includeSubdomains="true">www.singaporeanmalaysianrecipes.com</domain>
+    </domain-config>
+
+    <!-- 🧪 Optional: keep local cleartext for dev -->
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="true">10.0.2.2</domain> <!-- Android emulator localhost -->
+        <domain includeSubdomains="true">127.0.0.1</domain>
+        <domain includeSubdomains="true">localhost</domain>
     </domain-config>
 </network-security-config>
