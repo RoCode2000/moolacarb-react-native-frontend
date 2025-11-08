@@ -5,9 +5,9 @@ import {
   View,
   StyleSheet,
   ActivityIndicator,
-  Alert,
   Dimensions,
   Text,
+  Alert
 } from "react-native";
 import CalorieGoal from "../components/CalorieGoal";
 import MealRecom from "../components/MealRecom";
@@ -81,7 +81,6 @@ export default function HomeScreen() {
   >([]);
 
   const [allRecipes, setAllRecipes] = useState<any[]>([]);
-
   const [showModal, setShowModal] = useState(false);
   const [draft, setDraft] = useState<ModalInitial | null>(null);
 
@@ -91,7 +90,6 @@ export default function HomeScreen() {
       const response = await fetch(`${BASE_URL}/api/recipe/active`);
       const data = await response.json();
       setAllRecipes(data);
-      console.log("Full recipes fetched:", data);
     } catch (err) {
       console.error("Failed to fetch full recipes:", err);
     }
@@ -131,13 +129,13 @@ export default function HomeScreen() {
     }
   }, [userId]);
 
-  useEffect(() => {
-    if (!userId) {
-      setItems([]);
-      return;
-    }
-    fetchMealLogs();
-  }, [userId, fetchMealLogs]);
+  // ---- Fetch meal logs whenever screen gains focus ----
+  useFocusEffect(
+    useCallback(() => {
+      if (!userId) return;
+      fetchMealLogs();
+    }, [userId, fetchMealLogs])
+  );
 
   const todayItems = useMemo(() => {
     const now = new Date();
@@ -164,9 +162,7 @@ export default function HomeScreen() {
           if (!res.ok) throw new Error(`HTTP ${res.status}`);
           const data = await res.json();
           const newGoal = typeof data?.dailyTarget === "number" ? Math.round(data.dailyTarget) : 0;
-          if (isActive) {
-            setDailyTarget((prev) => (prev !== newGoal ? newGoal : prev));
-          }
+          if (isActive) setDailyTarget((prev) => (prev !== newGoal ? newGoal : prev));
         } catch {
           if (isActive) setDailyTarget(0);
         } finally {
@@ -236,7 +232,8 @@ export default function HomeScreen() {
     setShowModal(true);
   };
 
-  const handleDelete = async (id: string) => {
+  // ---- Modal / Meal log handlers ----
+  const handleDelete = useCallback((id: string) => {
     Alert.alert("Delete meal", "Are you sure you want to delete this entry?", [
       { text: "Cancel", style: "cancel" },
       {
@@ -246,14 +243,16 @@ export default function HomeScreen() {
           try {
             const res = await fetch(`${BASE_URL}/api/meallogs/${id}`, { method: "DELETE" });
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
-            await fetchMealLogs();
+            // refresh immediately
+            fetchMealLogs();
           } catch (e: any) {
             Alert.alert("Delete failed", e?.message ?? "Unknown error");
           }
         },
       },
     ]);
-  };
+  }, [fetchMealLogs]);
+
 
   const handleRecipeCardPress = (recipe: {
     id: string;
@@ -265,12 +264,8 @@ export default function HomeScreen() {
     img?: string | null;
   }) => {
     const fullRecipe = allRecipes.find((r) => String(r.recipeId) === recipe.id);
-    console.log("Full recipe matched:", fullRecipe);
 
-    if (!fullRecipe) {
-      Alert.alert("Recipe not found", "Could not find full recipe details.");
-      return;
-    }
+    if (!fullRecipe) return;
 
     Alert.alert("What would you like to do?", recipe.name, [
       {
@@ -341,7 +336,7 @@ export default function HomeScreen() {
         <AddEditMealModal
           visible={showModal}
           onClose={() => setShowModal(false)}
-          onSaved={fetchMealLogs}
+          onSaved={fetchMealLogs} // ensures immediate refresh after modal save
           userId={userId}
           baseUrl={BASE_URL}
           initial={draft}

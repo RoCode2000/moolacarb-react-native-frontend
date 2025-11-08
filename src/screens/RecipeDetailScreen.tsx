@@ -5,17 +5,18 @@ import {
   Text,
   Image,
   StyleSheet,
-  TextInput,
   FlatList,
   SafeAreaView,
   KeyboardAvoidingView,
   Platform,
+  Pressable,
 } from "react-native";
-import Ionicons from "react-native-vector-icons/Ionicons";
 import { colors } from "../theme/colors";
 import type { RouteProp } from "@react-navigation/native";
 import { useRecipes } from "../context/RecipeContext";
 import { BASE_URL } from "../config/api";
+import AddEditMealModal from "../components/AddEditMealModal";
+import { auth } from "../config/firebaseConfig";
 
 type RootStackParamList = {
   RecipeDetailScreen: { recipeId: string };
@@ -39,10 +40,6 @@ type RecipeDTO = {
   protein?: number;
   carbohydrates?: number;
   fat?: number;
-  saturatedFat?: number;
-  sodium?: number;
-  cholesterol?: number;
-  potassium?: number;
   serving?: number;
   prepTime?: number;
   cookTime?: number;
@@ -56,6 +53,19 @@ type RecipeDTO = {
   imageBinary?: string | null; // base64
 };
 
+type ModalInitial = {
+  name: string;
+  kcal: number | null;
+  carbs?: number | null;
+  protein?: number | null;
+  fat?: number | null;
+  time: Date;
+  remarks?: string;
+};
+
+const normalizeLocal = (d: Date) =>
+  new Date(d.getFullYear(), d.getMonth(), d.getDate(), d.getHours(), d.getMinutes(), d.getSeconds(), 0);
+
 const RecipeDetailScreen: React.FC<Props> = ({ route }) => {
   const { recipeId } = route.params;
   const { getRecipe } = useRecipes();
@@ -64,7 +74,11 @@ const RecipeDetailScreen: React.FC<Props> = ({ route }) => {
   const [remote, setRemote] = useState<RecipeDTO | null>(null);
   const [loading, setLoading] = useState(false);
 
-  // fetch from backend if not in context
+  const [showModal, setShowModal] = useState(false);
+  const [draft, setDraft] = useState<ModalInitial | null>(null);
+
+  const userId = auth.currentUser?.uid ?? null;
+
   useEffect(() => {
     if (recipeFromCtx) {
       setRemote(null);
@@ -109,15 +123,6 @@ const RecipeDetailScreen: React.FC<Props> = ({ route }) => {
     );
   }
 
-  const [reviewText, setReviewText] = useState("");
-  const [reviews, setReviews] = useState<string[]>([]);
-
-  const handleSendReview = () => {
-    if (!reviewText.trim()) return;
-    setReviews((prev) => [reviewText, ...prev]);
-    setReviewText("");
-  };
-
   const ingredientsArray = useMemo(
     () => (recipe.ingredients ? recipe.ingredients.split("\n") : []),
     [recipe.ingredients]
@@ -137,11 +142,25 @@ const RecipeDetailScreen: React.FC<Props> = ({ route }) => {
 
   const imageSource =
     isHttpLink
-      ? { uri: recipe.imageLink }                              // seeded / external
+      ? { uri: recipe.imageLink }
       : hasBinary
-      ? { uri: `data:image/jpeg;base64,${recipe.imageBinary}` } // user uploads (from backend)
+      ? { uri: `data:image/jpeg;base64,${recipe.imageBinary}` }
       : require("../../assets/logo.png");
 
+  // ---- Meal logging button ----
+  const handleAddMeal = () => {
+    if (!userId) return;
+    setDraft({
+      name: recipe.title ?? "",
+      kcal: recipe.calories ?? null,
+      carbs: recipe.carbohydrates ?? null,
+      protein: recipe.protein ?? null,
+      fat: recipe.fat ?? null,
+      time: normalizeLocal(new Date()),
+      remarks: "",
+    });
+    setShowModal(true);
+  };
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: "#fff" }}>
@@ -152,16 +171,11 @@ const RecipeDetailScreen: React.FC<Props> = ({ route }) => {
       >
         <FlatList
           style={styles.container}
-          data={reviews}
+          data={[]}
           keyExtractor={(item, idx) => idx.toString()}
-
           ListHeaderComponent={
             <View>
-              {imageSource ? (
-                <Image source={imageSource} style={styles.image} />
-              ) : (
-                <View style={[styles.image, { backgroundColor: "#eee" }]} />
-              )}
+              <Image source={imageSource} style={styles.image} />
 
               <Text style={styles.title}>{recipe.title}</Text>
 
@@ -182,47 +196,9 @@ const RecipeDetailScreen: React.FC<Props> = ({ route }) => {
                 )}
               </View>
 
-              <View style={styles.infoRow}>
-                {typeof recipe.serving === "number" && (
-                  <Text style={styles.infoItem}>Serving: {recipe.serving}</Text>
-                )}
-                {typeof recipe.prepTime === "number" && (
-                  <Text style={styles.infoItem}>
-                    Prep Time: {recipe.prepTime} mins
-                  </Text>
-                )}
-                {typeof recipe.cookTime === "number" && (
-                  <Text style={styles.infoItem}>
-                    Cook Time: {recipe.cookTime} mins
-                  </Text>
-                )}
-                {typeof recipe.restingTime === "number" && (
-                  <Text style={styles.infoItem}>
-                    Resting Time: {recipe.restingTime} mins
-                  </Text>
-                )}
-                {!!recipe.cuisine && (
-                  <Text style={styles.infoItem}>Cuisine: {recipe.cuisine}</Text>
-                )}
-                {!!recipe.mealType && (
-                  <Text style={styles.infoItem}>Meal Type: {recipe.mealType}</Text>
-                )}
-                {!!recipe.author && (
-                  <Text style={styles.infoItem}>Author: {recipe.author}</Text>
-                )}
-                {typeof recipe.overallRating === "number" && (
-                  <Text style={styles.infoItem}>
-                    Overall Rating: {recipe.overallRating}
-                  </Text>
-                )}
-              </View>
-
-              {!!recipe.description && (
-                <>
-                  <Text style={styles.sectionTitle}>Description</Text>
-                  <Text style={styles.listItem}>{recipe.description}</Text>
-                </>
-              )}
+              <Pressable style={styles.logButton} onPress={handleAddMeal}>
+                <Text style={styles.logButtonText}>Log this meal</Text>
+              </Pressable>
 
               {ingredientsArray.length > 0 && (
                 <>
@@ -245,13 +221,25 @@ const RecipeDetailScreen: React.FC<Props> = ({ route }) => {
                   ))}
                 </>
               )}
-
             </View>
           }
-
           contentContainerStyle={{ paddingBottom: 50 }}
         />
       </KeyboardAvoidingView>
+
+      {userId && draft && (
+        <AddEditMealModal
+          visible={showModal}
+          onClose={() => setShowModal(false)}
+          onSaved={() => {
+            setShowModal(false);
+            alert("Meal logged successfully!");
+          }}
+          userId={userId}
+          baseUrl={BASE_URL}
+          initial={draft}
+        />
+      )}
     </SafeAreaView>
   );
 };
@@ -273,33 +261,18 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "600",
   },
-  infoRow: { marginBottom: 15 },
-  infoItem: { fontSize: 14, marginBottom: 3, fontWeight: "500" },
+  logButton: {
+    backgroundColor: colors.primaryGreen,
+    paddingVertical: 10,
+    borderRadius: 10,
+    alignItems: "center",
+    marginVertical: 10,
+  },
+  logButtonText: {
+    color: "white",
+    fontWeight: "700",
+    fontSize: 16,
+  },
   sectionTitle: { fontSize: 18, fontWeight: "bold", marginVertical: 8 },
   listItem: { fontSize: 14, marginBottom: 4, lineHeight: 20 },
-  reviewItem: {
-    backgroundColor: "#f5f5f5",
-    padding: 10,
-    borderRadius: 8,
-    marginBottom: 6,
-  },
-  reviewInputRow: {
-    flexDirection: "row",
-    marginTop: 10,
-    alignItems: "center",
-  },
-  reviewInput: {
-    flex: 1,
-    borderWidth: 1,
-    borderColor: "#ccc",
-    borderRadius: 20,
-    paddingHorizontal: 15,
-    paddingVertical: 8,
-  },
-  sendButton: {
-    marginLeft: 8,
-    backgroundColor: colors.primaryGreen,
-    borderRadius: 20,
-    padding: 10,
-  },
 });
