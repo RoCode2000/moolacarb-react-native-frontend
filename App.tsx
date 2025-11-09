@@ -94,8 +94,8 @@ function AppTabs({ onLogout }: { onLogout: () => void }) {
         })}
       >
         <Tab.Screen name="Recipe" component={RecipeScreen} options={{ title: 'Recipe' }} />
-        <Tab.Screen name="Home" component={HomeScreen} options={{ title: 'Home' }} />
         <Tab.Screen name="Reports" component={ReportsScreen} options={{ title: 'Reports' }} />
+        <Tab.Screen name="Home" component={HomeScreen} options={{ title: 'Home' }} />
 
         {/* Intercept tab press for Chat */}
         <Tab.Screen
