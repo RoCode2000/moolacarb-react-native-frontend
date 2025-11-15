@@ -15,6 +15,7 @@ import { useUser } from "../context/UserContext";
 import { auth } from "../config/firebaseConfig";
 import AddEditMealModal from "../components/AddEditMealModal";
 import GroupedMealLog from "../components/GroupedMealLog";
+import { useFocusEffect } from "@react-navigation/native";
 
 type MealItem = {
   id: string;
@@ -156,14 +157,17 @@ export default function Report() {
     }
   }, [userId]);
 
-  useEffect(() => {
-    fetchAll();
-  }, [fetchAll]);
+  useFocusEffect(
+    useCallback(() => {
+      fetchAll();
+      return () => {
+      };
+    }, [fetchAll])
+  );
 
-  /** ===== Day-level aggregates (kcal & macros) ===== */
   type DayAgg = {
     kcal: number;
-    protein: number; pc: number; // pc = count of entries that had protein
+    protein: number; pc: number;
     carbs: number;   cc: number;
     fat: number;     fc: number;
   };
@@ -411,11 +415,8 @@ export default function Report() {
                 <>
                   <View style={styles.stackedBarSlim}>
                     {shareRows.map((row, idx) => {
-                      // ensure very tiny segments show up
                       const widthPct = Math.max(3, row.pct);
 
-                      // fade from strong to light
-                      // adjust the ramp if you have many items
                       const ramps = [1.0, 0.85, 0.72, 0.6, 0.5, 0.42, 0.36, 0.3];
                       const alpha = ramps[Math.min(idx, ramps.length - 1)];
 
@@ -434,7 +435,6 @@ export default function Report() {
                       );
                     })}
 
-                    {/* optional separators (very subtle) */}
                     <View pointerEvents="none" style={styles.stackedSeparators}>
                       {shareRows.map((row, idx) => {
                         if (idx === shareRows.length - 1) return null;
@@ -447,7 +447,6 @@ export default function Report() {
                     </View>
                   </View>
 
-                  {/* compact legend */}
                   <View style={{ marginTop: 8, gap: 6 }}>
                     {shareRows.map((row, idx) => {
                       const ramps = [1.0, 0.85, 0.72, 0.6, 0.5, 0.42, 0.36, 0.3];
@@ -460,7 +459,7 @@ export default function Report() {
                               { backgroundColor: colors.primaryGreen, opacity: alpha },
                             ]}
                           />
-                          <Text style={styles.legendTxt} numberOfLines={1}>{row.name}</Text>
+                          <Text style={styles.legendTxt} numberOfLines={1}>{row.name.length > 42 ? row.name.slice(0, 39) + "..." : row.name}</Text>
                           <Text style={[styles.legendTxt, { marginLeft: "auto" }]}>
                             {row.kcal} kcal
                           </Text>
